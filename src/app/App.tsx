@@ -27,9 +27,11 @@ import { chatSupervisorScenario } from "@/app/agentConfigs/chatSupervisor";
 import { customerServiceRetailCompanyName } from "@/app/agentConfigs/customerServiceRetail";
 import { chatSupervisorCompanyName } from "@/app/agentConfigs/chatSupervisor";
 import { simpleHandoffScenario } from "@/app/agentConfigs/simpleHandoff";
+import { pswTutorScenario } from "@/app/agentConfigs/pswTutorAgent";
 
 // Map used by connect logic for scenarios defined via the SDK.
 const sdkScenarioMap: Record<string, RealtimeAgent[]> = {
+  pswTutor: pswTutorScenario, // Add this line
   simpleHandoff: simpleHandoffScenario,
   customerServiceRetail: customerServiceRetailScenario,
   chatSupervisor: chatSupervisorScenario,
@@ -195,42 +197,60 @@ function App() {
   };
 
   const connectToRealtime = async () => {
+    console.log("1. connectToRealtime called."); // ADD THIS
     const agentSetKey = searchParams.get("agentConfig") || "default";
+
+
     if (sdkScenarioMap[agentSetKey]) {
       if (sessionStatus !== "DISCONNECTED") return;
       setSessionStatus("CONNECTING");
+      console.log("2. Status set to CONNECTING."); // ADD THIS
 
       try {
         const EPHEMERAL_KEY = await fetchEphemeralKey();
-        if (!EPHEMERAL_KEY) return;
+        if (!EPHEMERAL_KEY) {
+          console.error("3. FAILED to get ephemeral key. Stopping."); // ADD THIS
+          return;
+        }
+        console.log("3. Got ephemeral key successfully."); // ADD THIS
 
         // Ensure the selectedAgentName is first so that it becomes the root
-        const reorderedAgents = [...sdkScenarioMap[agentSetKey]];
-        const idx = reorderedAgents.findIndex((a) => a.name === selectedAgentName);
-        if (idx > 0) {
-          const [agent] = reorderedAgents.splice(idx, 1);
-          reorderedAgents.unshift(agent);
+        // const reorderedAgents = [...sdkScenarioMap[agentSetKey]];
+        // const idx = reorderedAgents.findIndex((a) => a.name === selectedAgentName);
+        // if (idx > 0) {
+        //   const [agent] = reorderedAgents.splice(idx, 1);
+        //   reorderedAgents.unshift(agent);
+        // }
+
+        const agentsToConnect = sdkScenarioMap[agentSetKey];
+        if (!agentsToConnect || agentsToConnect.length === 0) {
+          console.error("Agent configuration is missing or empty!");
+          setSessionStatus("DISCONNECTED");
+          return;
         }
 
         const companyName = agentSetKey === 'customerServiceRetail'
           ? customerServiceRetailCompanyName
           : chatSupervisorCompanyName;
         const guardrail = createModerationGuardrail(companyName);
-
+        console.log("4. About to call session.connect() with agent:", agentsToConnect[0].name); // Modified Log
         await connect({
           getEphemeralKey: async () => EPHEMERAL_KEY,
-          initialAgents: reorderedAgents,
+          initialAgents: agentsToConnect,
           audioElement: sdkAudioElement,
           outputGuardrails: [guardrail],
           extraContext: {
             addTranscriptBreadcrumb,
           },
         });
+        console.log("5. connect() call finished."); // ADD THIS
       } catch (err) {
         console.error("Error connecting via SDK:", err);
         setSessionStatus("DISCONNECTED");
       }
       return;
+    } else { // ADD THIS ELSE BLOCK
+      console.error(`6. Agent config key "${agentSetKey}" not found in sdkScenarioMap!`);
     }
   };
 
@@ -263,12 +283,12 @@ function App() {
     const turnDetection = isPTTActive
       ? null
       : {
-          type: 'server_vad',
-          threshold: 0.9,
-          prefix_padding_ms: 300,
-          silence_duration_ms: 500,
-          create_response: true,
-        };
+        type: 'server_vad',
+        threshold: 0.9,
+        prefix_padding_ms: 300,
+        silence_duration_ms: 500,
+        create_response: true,
+      };
 
     sendEvent({
       type: 'session.update',

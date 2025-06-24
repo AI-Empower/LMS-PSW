@@ -1,18 +1,25 @@
 import { zodTextFormat } from 'openai/helpers/zod';
 import { GuardrailOutputZod, GuardrailOutput } from '@/app/types';
 
-// Validator that calls the /api/responses endpoint to
-// validates the realtime output according to moderation policies. 
-// This will prevent the realtime model from responding in undesired ways
-// By sending it a corrective message and having it redirect the conversation.
 export async function runGuardrailClassifier(
   message: string,
   companyName: string = 'newTelco',
 ): Promise<GuardrailOutput> {
+
+  // --- HIGHLIGHT: THE PROMPT IS REWRITTEN FOR CLARITY AND ACCURACY ---
   const messages = [
     {
       role: 'user',
-      content: `You are an expert at classifying text according to moderation policies. Consider the provided message, analyze potential classes from output_classes, and output the best classification. Output json, following the provided schema. Keep your analysis and reasoning short and to the point, maximum 2 sentences.
+      content: `You are an expert at classifying text according to moderation policies. Analyze the provided message and classify it according to the output_classes.
+
+      Your response MUST be a single, valid JSON object that strictly adheres to the following format. Do not include any extra text or explanations outside of the JSON object itself.
+
+      <json_format>
+      {
+        "moderationCategory": "The single best classification category from the list.",
+        "moderationRationale": "A brief, one-sentence explanation for your classification."
+      }
+      </json_format>
 
       <info>
       - Company name: ${companyName}
@@ -37,6 +44,7 @@ export async function runGuardrailClassifier(
     headers: {
       'Content-Type': 'application/json',
     },
+    // This part of the request remains correct.
     body: JSON.stringify({
       model: 'gpt-4o-mini',
       input: messages,
@@ -54,17 +62,20 @@ export async function runGuardrailClassifier(
   const data = await response.json();
 
   try {
+    // This line will now succeed because the model will generate the correct fields.
     const output = GuardrailOutputZod.parse(data.output_parsed);
     return {
       ...output,
       testText: message,
     };
   } catch (error) {
+    // This catch block is still useful for catching any unexpected errors.
     console.error('Error parsing the message content as GuardrailOutput:', error);
     return Promise.reject('Failed to parse guardrail output.');
   }
 }
 
+// The rest of the file does not need to be changed.
 export interface RealtimeOutputGuardrailResult {
   tripwireTriggered: boolean;
   outputInfo: any;
@@ -76,7 +87,6 @@ export interface RealtimeOutputGuardrailArgs {
   context?: any;
 }
 
-// Creates a guardrail bound to a specific company name for output moderation purposes. 
 export function createModerationGuardrail(companyName: string) {
   return {
     name: 'moderation_guardrail',

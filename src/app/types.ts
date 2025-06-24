@@ -52,15 +52,15 @@ export interface AgentConfig {
   >;
   // addTranscriptBreadcrumb is a param in case we want to add additional breadcrumbs, e.g. for nested tool calls from a supervisor agent.
   downstreamAgents?:
-    | AgentConfig[]
-    | { name: string; publicDescription: string }[];
+  | AgentConfig[]
+  | { name: string; publicDescription: string }[];
 }
 
 export type AllAgentConfigsType = Record<string, AgentConfig[]>;
 
 export interface GuardrailResultType {
   status: "IN_PROGRESS" | "DONE";
-  testText?: string; 
+  testText?: string;
   category?: ModerationCategory;
   rationale?: string;
 }
@@ -142,7 +142,8 @@ export interface LoggedEvent {
 export const GuardrailOutputZod = z.object({
   moderationRationale: z.string(),
   moderationCategory: ModerationCategoryZod,
-  testText: z.string().optional(),
+  testText: z.string().optional().nullable(),
+
 });
 
 export type GuardrailOutput = z.infer<typeof GuardrailOutputZod>;

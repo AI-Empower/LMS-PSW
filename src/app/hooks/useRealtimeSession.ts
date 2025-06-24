@@ -61,7 +61,7 @@ export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
       default: {
         logServerEvent(event);
         break;
-      } 
+      }
     }
   }
 
@@ -108,6 +108,7 @@ export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
     }
   }, [sessionRef.current]);
 
+  // In src/app/hooks/useRealtimeSession.ts
   const connect = useCallback(
     async ({
       getEphemeralKey,
@@ -119,25 +120,24 @@ export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
       if (sessionRef.current) return; // already connected
 
       updateStatus('CONNECTING');
+      console.log("[useRealtimeSession] A. Got connect call."); // ADD LOG
 
       const ek = await getEphemeralKey();
+      console.log("[useRealtimeSession] B. Got ephemeral key."); // ADD LOG
       const rootAgent = initialAgents[0];
 
-      // This lets you use the codec selector in the UI to force narrow-band (8 kHz) codecs to
-      //  simulate how the voice agent sounds over a PSTN/SIP phone call.
       const codecParam = codecParamRef.current;
       const audioFormat = audioFormatForCodec(codecParam);
 
       sessionRef.current = new RealtimeSession(rootAgent, {
         transport: new OpenAIRealtimeWebRTC({
           audioElement,
-          // Set preferred codec before offer creation
           changePeerConnection: async (pc: RTCPeerConnection) => {
             applyCodec(pc);
             return pc;
           },
         }),
-        model: 'gpt-4o-realtime-preview-2025-06-03',
+        model: 'gpt-4o-mini-realtime-preview',
         config: {
           inputAudioFormat: audioFormat,
           outputAudioFormat: audioFormat,
@@ -148,8 +148,11 @@ export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
         outputGuardrails: outputGuardrails ?? [],
         context: extraContext ?? {},
       });
+      console.log("[useRealtimeSession] C. RealtimeSession object created."); // ADD LOG
 
       await sessionRef.current.connect({ apiKey: ek });
+      console.log("[useRealtimeSession] D. Session connected successfully."); // ADD LOG
+
       updateStatus('CONNECTED');
     },
     [callbacks, updateStatus],
@@ -170,7 +173,7 @@ export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
   const interrupt = useCallback(() => {
     sessionRef.current?.interrupt();
   }, []);
-  
+
   const sendUserText = useCallback((text: string) => {
     assertconnected();
     sessionRef.current!.sendMessage(text);

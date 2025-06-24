@@ -1,0 +1,68 @@
+.
+├── .DS_Store
+├── .env
+├── .gitignore
+├── eslint.config.mjs
+├── LICENSE
+├── next-env.d.ts
+├── next.config.ts
+├── output.txt
+├── package-lock.json
+├── package.json
+├── postcss.config.mjs
+├── public
+│   ├── arrow.svg
+│   ├── favicon.ico
+│   ├── openai-logomark.svg
+│   ├── screenshot_chat_supervisor.png
+│   └── screenshot_handoff.png
+├── README.md
+├── src
+│   └── app
+│       ├── agentConfigs
+│       │   ├── chatSupervisor
+│       │   │   ├── index.ts
+│       │   │   ├── sampleData.ts
+│       │   │   └── supervisorAgent.ts
+│       │   ├── customerServiceRetail
+│       │   │   ├── authentication.ts
+│       │   │   ├── index.ts
+│       │   │   ├── returns.ts
+│       │   │   ├── sales.ts
+│       │   │   └── simulatedHuman.ts
+│       │   ├── guardrails.ts
+│       │   ├── index.ts
+│       │   ├── pswTutorAgent.ts
+│       │   ├── simpleHandoff.ts
+│       │   ├── types.ts
+│       │   └── voiceAgentMetaprompt.txt
+│       ├── api
+│       │   ├── responses
+│       │   │   └── route.ts
+│       │   └── session
+│       │       └── route.ts
+│       ├── App.tsx
+│       ├── components
+│       │   ├── BottomToolbar.tsx
+│       │   ├── Events.tsx
+│       │   ├── GuardrailChip.tsx
+│       │   └── Transcript.tsx
+│       ├── contexts
+│       │   ├── EventContext.tsx
+│       │   └── TranscriptContext.tsx
+│       ├── globals.css
+│       ├── hooks
+│       │   ├── useAudioDownload.ts
+│       │   ├── useHandleSessionHistory.ts
+│       │   └── useRealtimeSession.ts
+│       ├── layout.tsx
+│       ├── lib
+│       │   ├── audioUtils.ts
+│       │   ├── codecUtils.ts
+│       │   └── envSetup.ts
+│       ├── page.tsx
+│       └── types.ts
+├── tailwind.config.ts
+└── tsconfig.json
+
+14 directories, 52 files
