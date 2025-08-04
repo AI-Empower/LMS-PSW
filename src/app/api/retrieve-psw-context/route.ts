@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     // will capture the relevant chunks for this dataset.
     const { data: chunks, error } = await supabase.rpc('match_psw_chunks', {
       query_embedding: queryEmbedding,
-      match_distance: 0.40, // Using the final, tuned production value.
+      match_distance: 0.70, // Using the final, tuned production value.
       match_count: 5,       // Return the top 5 chunks.
     });
 

@@ -22,19 +22,20 @@ import { createModerationGuardrail } from "@/app/agentConfigs/guardrails";
 
 // Agent configs
 import { allAgentSets, defaultAgentSetKey } from "@/app/agentConfigs";
-import { customerServiceRetailScenario } from "@/app/agentConfigs/customerServiceRetail";
-import { chatSupervisorScenario } from "@/app/agentConfigs/chatSupervisor";
+// import { customerServiceRetailScenario } from "@/app/agentConfigs/customerServiceRetail";
+// import { chatSupervisorScenario } from "@/app/agentConfigs/chatSupervisor";
 import { customerServiceRetailCompanyName } from "@/app/agentConfigs/customerServiceRetail";
 import { chatSupervisorCompanyName } from "@/app/agentConfigs/chatSupervisor";
-import { simpleHandoffScenario } from "@/app/agentConfigs/simpleHandoff";
+// import { simpleHandoffScenario } from "@/app/agentConfigs/simpleHandoff";
 import { pswTutorScenario } from "@/app/agentConfigs/pswTutorAgent";
 
 // Map used by connect logic for scenarios defined via the SDK.
 const sdkScenarioMap: Record<string, RealtimeAgent[]> = {
   pswTutor: pswTutorScenario, // Add this line
-  simpleHandoff: simpleHandoffScenario,
-  customerServiceRetail: customerServiceRetailScenario,
-  chatSupervisor: chatSupervisorScenario,
+  EarlyChildhoodTutor: pswTutorScenario, // Add this line
+  // simpleHandoff: simpleHandoffScenario,
+  // customerServiceRetail: customerServiceRetailScenario,
+  // chatSupervisor: chatSupervisorScenario,
 };
 
 import useAudioDownload from "./hooks/useAudioDownload";
@@ -453,23 +454,31 @@ function App() {
   const agentSetKey = searchParams.get("agentConfig") || "default";
 
   return (
-    <div className="text-base flex flex-col h-screen bg-gray-100 text-gray-800 relative">
-      <div className="p-5 text-lg font-semibold flex justify-between items-center">
+    // <div className="text-base flex flex-col h-screen bg-gray-100 text-gray-800 relative">
+    <div className="text-base flex flex-col h-screen bg-background text-text relative">
+
+      <div className="p-5 text-lg font-semibold flex justify-between items-center 
+                 rounded-2xl shadow-neu bg-background-neu">
         <div
           className="flex items-center cursor-pointer"
           onClick={() => window.location.reload()}
         >
           <div>
-            <Image
-              src="/openai-logomark.svg"
+
+            <Image src="/aiempower-logomark.png" alt="AI Empower Inc. Logo" width={40}
+              height={40}
+              className="mr-2" />
+            {/* <Image
+              // src="/openai-logomark.svg"
+              src="Main Logo (no-bg).png"
               alt="OpenAI Logo"
               width={20}
               height={20}
               className="mr-2"
-            />
+            /> */}
           </div>
           <div>
-            Realtime API <span className="text-gray-500">Agents</span>
+            AI Empower Learning Platform <span className="text-gray-500">PSW Course</span>
           </div>
         </div>
         <div className="flex items-center">
@@ -480,8 +489,8 @@ function App() {
             <select
               value={agentSetKey}
               onChange={handleAgentChange}
-              className="appearance-none border border-gray-300 rounded-lg text-base px-2 py-1 pr-8 cursor-pointer font-normal focus:outline-none"
-            >
+              className="appearance-none border border-primary rounded-lg text-base px-3 py-2 pr-8 
+               focus:border-accent focus:ring-accent focus:ring-1" >
               {Object.keys(allAgentSets).map((agentKey) => (
                 <option key={agentKey} value={agentKey}>
                   {agentKey}
@@ -508,8 +517,8 @@ function App() {
                 <select
                   value={selectedAgentName}
                   onChange={handleSelectedAgentChange}
-                  className="appearance-none border border-gray-300 rounded-lg text-base px-2 py-1 pr-8 cursor-pointer font-normal focus:outline-none"
-                >
+                  className="appearance-none border border-primary rounded-lg text-base px-3 py-2 pr-8 
+                focus:border-accent focus:ring-accent focus:ring-1" >
                   {selectedAgentConfigSet?.map((agent) => (
                     <option key={agent.name} value={agent.name}>
                       {agent.name}
@@ -535,7 +544,8 @@ function App() {
         </div>
       </div>
 
-      <div className="flex flex-1 gap-2 px-2 overflow-hidden relative">
+      {/* <div className="flex flex-1 gap-2 px-2 overflow-hidden relative"> */}
+      <div className="flex flex-1 gap-4 px-6 overflow-hidden relative">
         <Transcript
           userText={userText}
           setUserText={setUserText}
