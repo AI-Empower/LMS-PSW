@@ -1,0 +1,32 @@
+export PROJECT_ID=aiempower-eb198
+export RUNTIME_SA=psw-backend@aiempower-eb198.iam.gserviceaccount.com
+
+# (Optional) Create SA
+gcloud iam service-accounts create psw-backend \
+  --project=$PROJECT_ID \
+  --description="Runtime SA for PSW retrieve context API" \
+  --display-name="psw-backend"
+
+# Vertex AI
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$RUNTIME_SA" \
+  --role="roles/aiplatform.user"
+
+# Firestore
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$RUNTIME_SA" \
+  --role="roles/datastore.user"
+
+# (Optional) GCS read for backfill
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$RUNTIME_SA" \
+  --role="roles/storage.objectViewer"
+
+# Or bucket-scoped least-privilege:
+gsutil iam ch serviceAccount:$RUNTIME_SA:objectViewer gs://aiempower-embeddings-bucket
+
+# Attach SA to Cloud Run (if using Cloud Run)
+gcloud run services update YOUR_SERVICE_NAME \
+  --project=$PROJECT_ID \
+  --region=us-central1 \
+  --service-account=$RUNTIME_SA

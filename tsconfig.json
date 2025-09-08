@@ -32,7 +32,8 @@
     "**/*.ts",
     "**/*.tsx",
     "next-env.d.ts",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    "tools/backfill-embeddings."
   ],
   "exclude": [
     "node_modules",

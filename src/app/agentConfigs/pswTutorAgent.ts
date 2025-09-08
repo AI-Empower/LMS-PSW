@@ -1,47 +1,95 @@
+// src/agents/PSWTutor.ts
 import { RealtimeAgent, tool } from '@openai/agents/realtime';
 import { z } from 'zod';
 
-// This is the TypeScript boilerplate for the development caching pattern.
 declare global {
   // eslint-disable-next-line no-var
   var pswTutorAgentInstance: RealtimeAgent | undefined;
 }
 
-// The agent's instructions are now crucial for handling the RAG output.
+/**
+ * Agent instructions:
+ * - Always call the get_psw_knowledge tool for PSW questions.
+ * - Use the returned context and sources to compose an answer.
+ * - Include page numbers and chapter titles in citations.
+ * - If nothing is found, state that and provide general guidance (clearly labeled).
+ */
 const pswTutorInstructions = `
-  You are a friendly and knowledgeable tutor for students studying to be a Personal Support Worker (PSW).
-  Your tone is encouraging, patient, and clear.
-  When the user asks a question about PSW topics, procedures, or definitions, you MUST use the 'get_psw_knowledge' tool to find the relevant information.
-  After calling the tool, you will receive context which may include citations like "Source from Page X:".
-  You must use this context to construct your answer. Synthesize the information from the different sources into a single, cohesive answer.
-  Do NOT simply repeat the context back to the user along with page number and chapter.
-  If the tool returns no relevant information (i.e., the context is empty), you MUST state that you couldn't find information on that specific topic in the provided material. Do not invent answers.
-  For casual conversation (greetings, etc.), respond naturally without using the tool.
+You are a friendly, knowledgeable tutor for Personal Support Worker (PSW) students.
+Use an encouraging, patient, and clear tone.
+
+When the user asks a PSW-related question (procedures, definitions, practices, scenarios, etc.):
+1) You MUST call the tool "get_psw_knowledge" with the user's query.
+2) The tool returns:
+   - "context": synthesized text from the PSW manual chunks.
+   - "sources[]": supporting chunks with:
+       • id
+       • page_number
+       • chapter_title
+       • source_file
+       • similarity
+       • excerpt
+3) Compose a cohesive answer using the returned information. Do NOT paste raw chunks.
+4) Cite your sources clearly, e.g.:
+   "Chapter: <chapter_title> • Page: <page_number> (<source_file>)"
+   Include citations after paragraphs or in a short "References" section.
+5) If no results are returned (empty "sources" or "context"), explicitly say you couldn't find it in the provided material, THEN provide "General guidance (not from the manual)".
+
+For casual conversation (greetings, etc.) respond naturally without using the tool.
+Keep answers concise, accurate, and well-structured.
 `;
 
-// Define the tool's parameters using a Zod schema. This is correct.
+/**
+ * IMPORTANT for OpenAI "structured outputs":
+ * - All fields must be required.
+ * - Use `.nullable()` (not `.optional()`) for fields you may omit via null.
+ */
 const getPswKnowledgeParams = z.object({
-  query: z.string().describe(
-    "A detailed question or search query based on the user's message. This should be a full question to get the most relevant context."
-  ),
+  query: z
+    .string()
+    .describe('The user’s PSW question. Provide the full question for best retrieval.'),
+  sourceFile: z
+    .string()
+    .nullable()
+    .describe('Required (nullable). File to constrain search, e.g., "MaryOutput.txt". Use null to search default.'),
+  topK: z
+    .number()
+    .int()
+    .min(1)
+    .max(20)
+    .nullable()
+    .describe('Required (nullable). Number of top chunks to retrieve. Use null for default (5).'),
 });
 
-// Define the tool itself.
+/**
+ * Tool implementation:
+ * - Calls your Next.js RAG route.
+ * - Returns a synthesized context plus a structured `sources` list the agent can cite from.
+ */
 const getPswKnowledgeTool = tool({
   name: 'get_psw_knowledge',
-  description: 'Retrieves specific knowledge and text from the PSW course material to answer a user\'s question.',
+  description:
+    'Retrieves knowledge from the PSW manual and returns context plus structured sources with page numbers and chapter titles for citation.',
   parameters: getPswKnowledgeParams,
 
-  // --- HIGHLIGHT: THE FINAL, LIVE EXECUTE FUNCTION ---
-  // This function now makes a real network call to your backend API.
-  execute: async ({ query }) => {
+  execute: async ({ query, sourceFile, topK }) => {
     console.log(`[AGENT_TOOL] Calling RAG API with query: "${query}"`);
+
     try {
-      // 1. Call the secure backend API route we built and tested.
+      // Normalize required-but-nullable fields
+      const effectiveTopK = topK ?? 5;
+      const effectiveSource = (sourceFile && sourceFile.trim()) || undefined;
+
+      const body: Record<string, unknown> = {
+        query,
+        topK: effectiveTopK,
+      };
+      if (effectiveSource) body.sourceFile = effectiveSource;
+
       const response = await fetch('/api/retrieve-psw-context', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
@@ -49,20 +97,50 @@ const getPswKnowledgeTool = tool({
       }
 
       const data = await response.json();
-      console.log(`[AGENT_TOOL] Received context from RAG API.`);
+      console.log('[AGENT_TOOL] RAG meta:', {
+        scanned: data?.meta?.scanned,
+        kept: data?.meta?.kept,
+        topK: data?.meta?.topK,
+        sourceFile: data?.meta?.sourceFile,
+      });
 
-      // 2. Return the retrieved context in the expected success format.
-      // The agent will now receive the real content from your manual.
-      return { success: true, context: data.context };
+      const sources =
+        Array.isArray(data?.chunks) && data.chunks.length > 0
+          ? data.chunks.map((c: any) => ({
+            id: String(c.id ?? ''),
+            page_number: typeof c.page_number === 'number' ? c.page_number : undefined,
+            chapter_title: typeof c.chapter_title === 'string' ? c.chapter_title : '',
+            source_file: typeof c.source_file === 'string' ? c.source_file : '',
+            similarity: typeof c.similarity === 'number' ? c.similarity : undefined,
+            excerpt:
+              typeof c.content === 'string'
+                ? c.content.length > 500
+                  ? c.content.slice(0, 500) + '…'
+                  : c.content
+                : '',
+          }))
+          : [];
 
+      return {
+        success: true as const,
+        context: typeof data?.context === 'string' ? data.context : '',
+        sources,
+        meta: data?.meta ?? {},
+      };
     } catch (error) {
       console.error('[AGENT_TOOL] Error calling RAG API:', error);
-      return { success: false, error: 'Sorry, I had trouble looking that up in the manual.' };
+      return {
+        success: false as const,
+        error:
+          'Sorry, I had trouble looking that up in the manual. Please try rephrasing or narrowing the question.',
+      };
     }
   },
 });
 
-// The Caching Pattern remains essential for development stability.
+/**
+ * Agent instantiation with dev-time singleton.
+ */
 let pswTutorAgent: RealtimeAgent;
 
 if (process.env.NODE_ENV === 'production') {
@@ -85,7 +163,6 @@ if (process.env.NODE_ENV === 'production') {
   }
   pswTutorAgent = global.pswTutorAgentInstance;
 }
-// --- END OF CACHING LOGIC ---
 
 export { pswTutorAgent };
 export const pswTutorScenario = [pswTutorAgent];

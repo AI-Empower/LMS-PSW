@@ -31,8 +31,8 @@ import { pswTutorScenario } from "@/app/agentConfigs/pswTutorAgent";
 
 // Map used by connect logic for scenarios defined via the SDK.
 const sdkScenarioMap: Record<string, RealtimeAgent[]> = {
-  pswTutor: pswTutorScenario, // Add this line
-  EarlyChildhoodTutor: pswTutorScenario, // Add this line
+  PSW: pswTutorScenario, // Add this line
+  ECA: pswTutorScenario, // Add this line
   // simpleHandoff: simpleHandoffScenario,
   // customerServiceRetail: customerServiceRetailScenario,
   // chatSupervisor: chatSupervisorScenario,
@@ -483,7 +483,7 @@ function App() {
         </div>
         <div className="flex items-center">
           <label className="flex items-center text-base gap-1 mr-2 font-medium">
-            Scenario
+            Course
           </label>
           <div className="relative inline-block">
             <select
@@ -511,7 +511,7 @@ function App() {
           {agentSetKey && (
             <div className="flex items-center ml-6">
               <label className="flex items-center text-base gap-1 mr-2 font-medium">
-                Agent
+                Teacher
               </label>
               <div className="relative inline-block">
                 <select
