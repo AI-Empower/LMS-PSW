@@ -31,7 +31,7 @@ When the user asks a PSW-related question (procedures, definitions, practices, s
        • excerpt
 3) Compose a cohesive answer using the returned information. Do NOT paste raw chunks.
 4) Cite your sources clearly, e.g.:
-   "Chapter: <chapter_title> • Page: <page_number> (<source_file>)"
+   "Chapter: <chapter_title> • Page: <page_number> Source File: <source_file>"
    Include citations after paragraphs or in a short "References" section.
 5) If no results are returned (empty "sources" or "context"), explicitly say you couldn't find it in the provided material, THEN provide "General guidance (not from the manual)".
 

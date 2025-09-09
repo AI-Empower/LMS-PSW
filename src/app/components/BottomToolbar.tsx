@@ -1,3 +1,6 @@
+// src/app/components/BottomToolbar.tsx
+"use client";
+
 import React from "react";
 import { SessionStatus } from "@/app/types";
 
@@ -36,8 +39,7 @@ function BottomToolbar({
   const isConnecting = sessionStatus === "CONNECTING";
 
   const handleCodecChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newCodec = e.target.value;
-    onCodecChange(newCodec);
+    onCodecChange(e.target.value);
   };
 
   function getConnectionButtonLabel() {
@@ -47,108 +49,112 @@ function BottomToolbar({
   }
 
   function getConnectionButtonClasses() {
-    const baseClasses = "text-white text-base p-2 w-36 rounded-md h-full";
-    const cursorClass = isConnecting ? "cursor-not-allowed" : "cursor-pointer";
-
+    const base =
+      "text-base px-4 py-2 w-36 rounded-md h-full transition-colors focus:outline-none focus:ring-1 focus:ring-accent";
+    const cursor = isConnecting ? "cursor-not-allowed" : "cursor-pointer";
     if (isConnected) {
-      // Connected -> label "Disconnect" -> red
-      return `bg-red-600 hover:bg-red-700 ${cursorClass} ${baseClasses}`;
+      // Red "Disconnect"
+      return `bg-red-600 hover:bg-red-700 text-white ${cursor} ${base}`;
     }
-    // Disconnected or connecting -> label is either "Connect" or "Connecting" -> black
-    return `bg-black hover:bg-gray-900 ${cursorClass} ${baseClasses}`;
+    // Neutral "Connect"/"Connecting" — high contrast using tokens
+    return `bg-foreground hover:opacity-90 text-background ${cursor} ${base}`;
   }
 
   return (
-    <div className="p-4 flex flex-row items-center justify-center gap-x-8">
-      <button
-        onClick={onToggleConnection}
-        className={getConnectionButtonClasses()}
-        disabled={isConnecting}
-      >
-        {getConnectionButtonLabel()}
-      </button>
-
-      <div className="flex flex-row items-center gap-2">
-        <input
-          id="push-to-talk"
-          type="checkbox"
-          checked={isPTTActive}
-          onChange={(e) => setIsPTTActive(e.target.checked)}
-          disabled={!isConnected}
-          className="w-4 h-4"
-        />
-        <label
-          htmlFor="push-to-talk"
-          className="flex items-center cursor-pointer"
-        >
-          Push to talk
-        </label>
+    // This container is visually a toolbar; layout height control is handled by the parent (wrap with `flex-none` in App.tsx).
+    <div className="w-full border-t border-border bg-card text-foreground">
+      <div className="p-4 flex flex-row items-center justify-center gap-x-6">
+        {/* Connect / Disconnect */}
         <button
-          onMouseDown={handleTalkButtonDown}
-          onMouseUp={handleTalkButtonUp}
-          onTouchStart={handleTalkButtonDown}
-          onTouchEnd={handleTalkButtonUp}
-          disabled={!isPTTActive}
-          className={
-            (isPTTUserSpeaking ? "bg-gray-300" : "bg-gray-200") +
-            " py-1 px-4 cursor-pointer rounded-md" +
-            (!isPTTActive ? " bg-gray-100 text-gray-400" : "")
-          }
+          onClick={onToggleConnection}
+          className={getConnectionButtonClasses()}
+          disabled={isConnecting}
+          aria-label={getConnectionButtonLabel()}
         >
-          Talk
+          {getConnectionButtonLabel()}
         </button>
-      </div>
 
-      <div className="flex flex-row items-center gap-1">
-        <input
-          id="audio-playback"
-          type="checkbox"
-          checked={isAudioPlaybackEnabled}
-          onChange={(e) => setIsAudioPlaybackEnabled(e.target.checked)}
-          disabled={!isConnected}
-          className="w-4 h-4"
-        />
-        <label
-          htmlFor="audio-playback"
-          className="flex items-center cursor-pointer"
-        >
-          Audio playback
-        </label>
-      </div>
+        {/* Push-to-talk */}
+        <div className="flex flex-row items-center gap-2">
+          <input
+            id="push-to-talk"
+            type="checkbox"
+            checked={isPTTActive}
+            onChange={(e) => setIsPTTActive(e.target.checked)}
+            disabled={!isConnected}
+            className="w-4 h-4 accent-current disabled:opacity-50"
+          />
+          <label htmlFor="push-to-talk" className="flex items-center cursor-pointer">
+            Push to talk
+          </label>
+          <button
+            onMouseDown={handleTalkButtonDown}
+            onMouseUp={handleTalkButtonUp}
+            onTouchStart={handleTalkButtonDown}
+            onTouchEnd={handleTalkButtonUp}
+            disabled={!isPTTActive}
+            className={[
+              "px-4 py-1 rounded-md border border-border transition-colors",
+              isPTTUserSpeaking ? "bg-background" : "bg-card",
+              !isPTTActive ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-background",
+              "focus:outline-none focus:ring-1 focus:ring-accent",
+            ].join(" ")}
+            aria-pressed={isPTTUserSpeaking}
+          >
+            Talk
+          </button>
+        </div>
 
-      <div className="flex flex-row items-center gap-2">
-        <input
-          id="logs"
-          type="checkbox"
-          checked={isEventsPaneExpanded}
-          onChange={(e) => setIsEventsPaneExpanded(e.target.checked)}
-          className="w-4 h-4"
-        />
-        <label htmlFor="logs" className="flex items-center cursor-pointer">
-          Logs
-        </label>
-      </div>
+        {/* Audio playback toggle */}
+        <div className="flex flex-row items-center gap-2">
+          <input
+            id="audio-playback"
+            type="checkbox"
+            checked={isAudioPlaybackEnabled}
+            onChange={(e) => setIsAudioPlaybackEnabled(e.target.checked)}
+            disabled={!isConnected}
+            className="w-4 h-4 accent-current disabled:opacity-50"
+          />
+          <label htmlFor="audio-playback" className="flex items-center cursor-pointer">
+            Audio playback
+          </label>
+        </div>
 
-      <div className="flex flex-row items-center gap-2">
-        <div>Codec:</div>
-        {/*
-          Codec selector – Lets you force the WebRTC track to use 8 kHz 
-          PCMU/PCMA so you can preview how the agent will sound 
-          (and how ASR/VAD will perform) when accessed via a 
-          phone network.  Selecting a codec reloads the page with ?codec=...
-          which our App-level logic picks up and applies via a WebRTC monkey
-          patch (see codecPatch.ts).
-        */}
-        <select
-          id="codec-select"
-          value={codec}
-          onChange={handleCodecChange}
-          className="border border-gray-300 rounded-md px-2 py-1 focus:outline-none cursor-pointer"
-        >
-          <option value="opus">Opus (48 kHz)</option>
-          <option value="pcmu">PCMU (8 kHz)</option>
-          <option value="pcma">PCMA (8 kHz)</option>
-        </select>
+        {/* Logs toggle */}
+        <div className="flex flex-row items-center gap-2">
+          <input
+            id="logs"
+            type="checkbox"
+            checked={isEventsPaneExpanded}
+            onChange={(e) => setIsEventsPaneExpanded(e.target.checked)}
+            className="w-4 h-4 accent-current"
+          />
+          <label htmlFor="logs" className="flex items-center cursor-pointer">
+            Logs
+          </label>
+        </div>
+
+        {/* Codec select */}
+        <div className="flex flex-row items-center gap-2">
+          <div>Codec:</div>
+          <select
+            id="codec-select"
+            value={codec}
+            onChange={handleCodecChange}
+            className="border border-border bg-background text-foreground rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer"
+            aria-label="Select codec"
+          >
+            <option className="bg-background text-foreground" value="opus">
+              Opus (48 kHz)
+            </option>
+            <option className="bg-background text-foreground" value="pcmu">
+              PCMU (8 kHz)
+            </option>
+            <option className="bg-background text-foreground" value="pcma">
+              PCMA (8 kHz)
+            </option>
+          </select>
+        </div>
       </div>
     </div>
   );

@@ -5,12 +5,27 @@
 :root {
   --background: #fafafa;
   --foreground: #171717;
+  --card: #ffffff;
+  /* top bar / panels */
+  --border: #e5e7eb;
+  /* separators / input borders */
+  --muted: #6b7280;
+  /* secondary text */
+  --accent: #3b82f6;
+  /* focus ring / accents */
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --card: #111827;
+    /* dark panel */
+    --border: #1f2937;
+    /* dark border */
+    --muted: #9ca3af;
+    /* lighter gray for dark mode */
+    --accent: #60a5fa;
   }
 }
 
@@ -21,11 +36,15 @@ body {
     "Helvetica Neue", Arial, "Noto Sans", sans-serif;
 }
 
-/* .shadow-neu {
-  box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.2),
-    -8px -8px 16px rgba(255, 255, 255, 0.05);
+/* optional utility helpers */
+.bg-card {
+  background-color: var(--card);
 }
 
-.bg-background-neu {
-  background: #1F2937;
-} */
+.text-muted {
+  color: var(--muted);
+}
+
+.border-border {
+  border-color: var(--border);
+}
