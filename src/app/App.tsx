@@ -157,29 +157,6 @@ function App() {
   const getOffset = () => pageOffset;
   const setOffset = (o: number) => setPageOffset(Math.floor(o));
 
-  const handlePageStep = (delta: number) => {
-    goToPage(pdfPage + delta);
-  };
-
-  const handlePageInput = (page: number) => {
-    if (Number.isNaN(page)) return;
-    goToPage(page);
-  };
-
-  const handleZoomStep = (delta: number) => {
-    setZoom(pdfZoom + delta);
-  };
-
-  const handleZoomInput = (zoom: number) => {
-    if (Number.isNaN(zoom)) return;
-    setZoom(zoom);
-  };
-
-  const resetPdfView = () => {
-    goToPage(1);
-    setZoom(DEFAULT_PDF_ZOOM);
-  };
-
   const handleRightPaneModeChange = (mode: RightPaneMode) => {
     if (mode === "logs") {
       if (!isEventsPaneExpanded) {
@@ -569,7 +546,7 @@ function App() {
       setOffset={setOffset}
     >
       {/* ✅ Height/scroll fixes: allow mobile scroll, keep desktop tidy */}
-      <div className="text-base flex flex-col min-h-[100dvh] lg:h-screen w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 pb-10 gap-6 text-foreground relative">
+      <div className="text-base flex flex-col min-h-[100dvh] w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 pb-6 gap-4 text-foreground">
         {/* ===== Top Bar ===== */}
         <div className="flex-none rounded-lg-theme border border-border bg-card/95 backdrop-blur-sm shadow-soft px-5 py-4 flex flex-wrap items-center justify-between gap-4">
           {/* Left: Logo + Title */}
@@ -664,23 +641,21 @@ function App() {
         <div className="flex-1 min-h-0 w-full">
           <div
             ref={splitContainerRef}
-            className="flex flex-col gap-4 min-h-0 items-stretch lg:h-full lg:flex-row"
+            className="flex min-h-0 flex-col gap-4 lg:flex-row"
           >
             {/* LEFT: Transcript — ✅ fills to bottom immediately */}
-<div
-  className="flex flex-col min-h-[320px] flex-1 min-w-0 transition-[flex-basis] duration-200"
-  style={leftPaneStyle}
->
-  <div className="flex-1 min-h-0 overflow-hidden rounded-lg-theme border border-border bg-card/95">
-    <Transcript
-      userText={userText}
-      setUserText={setUserText}
-      onSendMessage={handleSendTextMessage}
-      downloadRecording={downloadRecording}
-      canSend={sessionStatus === "CONNECTED"}
-    />
-  </div>
-</div>
+            <div
+              className="flex min-h-[320px] flex-1 min-w-0 flex-col transition-[flex-basis] duration-200"
+              style={leftPaneStyle}
+            >
+              <Transcript
+                userText={userText}
+                setUserText={setUserText}
+                onSendMessage={handleSendTextMessage}
+                downloadRecording={downloadRecording}
+                canSend={sessionStatus === "CONNECTED"}
+              />
+            </div>
 
             {/* Divider (desktop) */}
             <div
@@ -715,154 +690,74 @@ function App() {
 
             {/* RIGHT: PDF / Logs — responsive with manual controls */}
             <div
-              className="flex flex-col min-h-[320px] flex-1 min-w-0 transition-[flex-basis] duration-200"
+              className="flex min-h-[320px] flex-1 min-w-0 flex-col transition-[flex-basis] duration-200"
               style={rightPaneStyle}
             >
-              <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg-theme border border-border bg-card/95 shadow-soft">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card/90 px-5 py-3">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-soft">
-                      {rightPaneMode === "pdf" ? "PSW Manual" : "Session Logs"}
-                    </span>
-                    <div className="inline-flex items-center rounded-full border border-border bg-card/80 p-1">
-                      <button
-                        type="button"
-                        onClick={() => handleRightPaneModeChange("pdf")}
-                        className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                          rightPaneMode === "pdf"
-                            ? "bg-foreground text-background shadow-sm"
-                            : "text-muted-soft hover:text-foreground"
-                        }`}
-                        aria-pressed={rightPaneMode === "pdf"}
-                      >
-                        Manual
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRightPaneModeChange("logs")}
-                        className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                          rightPaneMode === "logs"
-                            ? "bg-foreground text-background shadow-sm"
-                            : isEventsPaneExpanded
-                            ? "text-muted-soft hover:text-foreground"
-                            : "text-muted-soft/70 cursor-not-allowed"
-                        }`}
-                        aria-pressed={rightPaneMode === "logs"}
-                        aria-disabled={!isEventsPaneExpanded}
-                        disabled={!isEventsPaneExpanded && rightPaneMode !== "logs"}
-                        title={
-                          isEventsPaneExpanded
-                            ? "View real-time session logs"
-                            : "Enable logs from the toolbar to view events"
-                        }
-                      >
-                        Logs
-                      </button>
-                    </div>
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg-theme border border-border bg-card">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2">
+                  <div className="flex flex-wrap items-center gap-3 text-sm font-semibold text-foreground">
+                    <span>{rightPaneMode === "pdf" ? "PSW Manual" : "Session Logs"}</span>
+                    {rightPaneMode === "pdf" ? (
+                      <span className="text-xs font-medium text-muted-soft">
+                        Page {pdfPage} • {pdfZoom}%
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-500">
+                        <span
+                          className="h-2 w-2 animate-pulse rounded-full bg-emerald-500"
+                          aria-hidden="true"
+                        />
+                        Live
+                      </span>
+                    )}
                   </div>
-                  {rightPaneMode === "pdf" ? (
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-muted-soft">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs uppercase tracking-wide">Page</span>
-                        <div className="flex items-center gap-1 rounded-full border border-border bg-card/80 px-2 py-1">
-                          <button
-                            type="button"
-                            onClick={() => handlePageStep(-1)}
-                            className="flex h-7 w-7 items-center justify-center rounded-full bg-card/70 text-foreground hover:bg-card"
-                            disabled={pdfPage <= 1}
-                            aria-label="Previous page"
-                          >
-                            &minus;
-                          </button>
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min={1}
-                            value={pdfPage}
-                            onChange={(event) => {
-                              const value = Number(event.target.value);
-                              if (Number.isNaN(value)) return;
-                              handlePageInput(value);
-                            }}
-                            className="w-14 rounded-full border border-transparent bg-card px-2 py-1 text-center text-sm text-foreground focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/40"
-                            aria-label="Current PDF page"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handlePageStep(1)}
-                            className="flex h-7 w-7 items-center justify-center rounded-full bg-card/70 text-foreground hover:bg-card"
-                            aria-label="Next page"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs uppercase tracking-wide">Zoom</span>
-                        <div className="flex items-center gap-2 rounded-full bg-card/80 px-3 py-1">
-                          <button
-                            type="button"
-                            onClick={() => handleZoomStep(-10)}
-                            className="flex h-7 w-7 items-center justify-center rounded-full bg-card/70 text-foreground hover:bg-card"
-                            aria-label="Zoom out"
-                          >
-                            &minus;
-                          </button>
-                          <input
-                            type="range"
-                            min={MIN_PDF_ZOOM}
-                            max={MAX_PDF_ZOOM}
-                            step={10}
-                            value={pdfZoom}
-                            onChange={(event) => handleZoomInput(Number(event.target.value))}
-                            className="h-2 w-28 accent-[var(--accent)]"
-                            aria-label="Zoom level"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleZoomStep(10)}
-                            className="flex h-7 w-7 items-center justify-center rounded-full bg-card/70 text-foreground hover:bg-card"
-                            aria-label="Zoom in"
-                          >
-                            +
-                          </button>
-                          <span className="text-xs font-medium text-muted">{pdfZoom}%</span>
-                          <button
-                            type="button"
-                            onClick={resetPdfView}
-                            className="inline-flex items-center rounded-full bg-accent-soft/70 px-2 py-1 text-xs font-medium text-accent hover:bg-accent-soft"
-                          >
-                            Reset
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-emerald-500">
-                      <span
-                        className="inline-flex h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-500"
-                        aria-hidden="true"
-                      />
-                      Live feed
-                    </div>
-                  )}
+                  <div className="inline-flex items-center gap-1 rounded-md border border-border bg-card p-1">
+                    <button
+                      type="button"
+                      onClick={() => handleRightPaneModeChange("pdf")}
+                      className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+                        rightPaneMode === "pdf"
+                          ? "bg-foreground text-background shadow-sm"
+                          : "text-muted-soft hover:text-foreground"
+                      }`}
+                      aria-pressed={rightPaneMode === "pdf"}
+                    >
+                      Manual
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRightPaneModeChange("logs")}
+                      className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+                        rightPaneMode === "logs"
+                          ? "bg-foreground text-background shadow-sm"
+                          : isEventsPaneExpanded
+                          ? "text-muted-soft hover:text-foreground"
+                          : "text-muted-soft/70 cursor-not-allowed"
+                      }`}
+                      aria-pressed={rightPaneMode === "logs"}
+                      aria-disabled={!isEventsPaneExpanded}
+                      disabled={!isEventsPaneExpanded && rightPaneMode !== "logs"}
+                      title={
+                        isEventsPaneExpanded
+                          ? "View real-time session logs"
+                          : "Enable logs from the toolbar to view events"
+                      }
+                    >
+                      Logs
+                    </button>
+                  </div>
                 </div>
-                <div className="flex-1 min-h-[320px]">
+                <div className="flex-1 min-h-0">
                   {rightPaneMode === "pdf" ? (
-                    <div className="relative h-[60vh] sm:h-[68vh] lg:h-full w-full overflow-hidden rounded-b-lg-theme bg-card">
-                      <PdfPane
-                        url={MARY_PDF_URL}
-                        renderedPage={pdfPage}
-                        zoomPct={pdfZoom}
-                        label="PSW Manual"
-                        className="rounded-none"
-                      />
-                      <div className="pointer-events-none absolute inset-0 ring-1 ring-black/5" />
-                    </div>
+                    <PdfPane
+                      url={MARY_PDF_URL}
+                      renderedPage={pdfPage}
+                      zoomPct={pdfZoom}
+                      label="PSW Manual"
+                      className="h-full w-full"
+                    />
                   ) : (
-                    <div className="h-[55vh] sm:h-[62vh] lg:h-full">
-                      <Events isExpanded={isEventsPaneExpanded} />
-                    </div>
+                    <Events isExpanded={isEventsPaneExpanded} />
                   )}
                 </div>
               </div>
