@@ -15,9 +15,9 @@ function Events({ isExpanded }: EventsProps) {
   const { loggedEvents, toggleExpand } = useEvent();
 
   const getDirectionArrow = (direction: string) => {
-    if (direction === "client") return { symbol: "▲", color: "#7f5af0" }; // purple
-    if (direction === "server") return { symbol: "▼", color: "#2cb67d" }; // green
-    return { symbol: "•", color: "#888" };
+    if (direction === "client") return { symbol: "->", color: "#1fbe78" };
+    if (direction === "server") return { symbol: "<-", color: "#4c6ef5" };
+    return { symbol: "..", color: "#94a3b8" };
   };
 
   useEffect(() => {
@@ -33,26 +33,21 @@ function Events({ isExpanded }: EventsProps) {
     <div
       ref={eventLogsContainerRef}
       className={[
-        // Base: acts as a column panel that can shrink and scroll
-        "rounded-xl bg-card border border-border",
-        "flex flex-col",            // column layout
+        "rounded-lg-theme border border-border bg-card/95 shadow-soft backdrop-blur-sm",
+        "flex flex-col",
         isExpanded ? "flex-1" : "flex-none",
-        "min-h-0",                  // <-- allows inner overflow to work
-        // Width/visibility toggle
-        isExpanded
-          ? "w-1/2 overflow-auto"   // scroll when expanded
-          : "w-0 overflow-hidden opacity-0",
+        "min-h-0",
+        isExpanded ? "w-full overflow-auto" : "w-0 overflow-hidden opacity-0",
         "transition-all duration-200 ease-in-out",
       ].join(" ")}
     >
       {isExpanded && (
         <div className="flex flex-col min-h-0">
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 py-3.5 sticky top-0 z-10 text-base border-b border-border bg-card rounded-t-xl">
-            <span className="font-semibold text-foreground">Logs</span>
+          <div className="flex items-center justify-between px-5 py-3 text-base border-b border-border bg-card/90 rounded-t-lg">
+            <span className="font-semibold text-foreground">Session Logs</span>
+            <span className="text-xs uppercase tracking-widest text-muted-soft">Live</span>
           </div>
 
-          {/* Events list */}
           <div className="flex-1 min-h-0">
             {loggedEvents.map((log, idx) => {
               const arrowInfo = getDirectionArrow(log.direction);
@@ -63,36 +58,36 @@ function Events({ isExpanded }: EventsProps) {
               return (
                 <div
                   key={`${log.id}-${idx}`}
-                  className="border-t border-border py-2 px-6 font-mono"
+                  className="border-t border-border/70 px-5 py-3 font-mono text-sm hover:bg-accent-soft/50 transition-colors"
                 >
                   <div
                     onClick={() => toggleExpand(log.id)}
                     className="flex items-center justify-between cursor-pointer"
                   >
-                    <div className="flex items-center flex-1">
+                    <div className="flex items-center flex-1 gap-3">
                       <span
                         style={{ color: arrowInfo.color }}
-                        className="ml-1 mr-2 select-none"
+                        className="text-base select-none"
                       >
                         {arrowInfo.symbol}
                       </span>
                       <span
                         className={
-                          "flex-1 text-sm " +
+                          "flex-1 truncate " +
                           (isError ? "text-red-500" : "text-foreground")
                         }
                       >
                         {log.eventName}
                       </span>
                     </div>
-                    <div className="text-muted ml-1 text-xs whitespace-nowrap">
+                    <div className="text-muted-soft ml-3 text-xs whitespace-nowrap">
                       {log.timestamp}
                     </div>
                   </div>
 
                   {log.expanded && log.eventData && (
                     <div className="text-foreground text-left">
-                      <pre className="border-l-2 ml-1 border-border whitespace-pre-wrap break-words font-mono text-xs mb-2 mt-2 pl-2">
+                      <pre className="border-l-2 ml-1 border-border whitespace-pre-wrap break-words font-mono text-xs my-2 pl-3">
                         {JSON.stringify(log.eventData, null, 2)}
                       </pre>
                     </div>
@@ -108,3 +103,6 @@ function Events({ isExpanded }: EventsProps) {
 }
 
 export default Events;
+
+
+
