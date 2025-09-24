@@ -122,6 +122,11 @@ function App() {
   const [isDraggingSplit, setIsDraggingSplit] = useState<boolean>(false);
   const [isDesktopLayout, setIsDesktopLayout] = useState<boolean>(false);
 
+  const handleLogsVisibilityChange = (nextVisible: boolean) => {
+    setIsEventsPaneExpanded(nextVisible);
+    setRightPaneMode(nextVisible ? "logs" : "pdf");
+  };
+
   const goToPage = (page: number) => {
     setPdfPage(Math.max(1, Math.floor(page)));
   };
@@ -133,7 +138,7 @@ function App() {
     const mapped = Math.max(1, Math.floor(printedPage) + pageOffset);
     setPdfPage(mapped);
     // ensure the pane is visible when we jump via citation
-    setRightPaneMode("pdf");
+    handleLogsVisibilityChange(false);
   };
   const getOffset = () => pageOffset;
   const setOffset = (o: number) => setPageOffset(Math.floor(o));
@@ -433,9 +438,6 @@ function App() {
   useEffect(() => {
     const storedPushToTalkUI = localStorage.getItem("pushToTalkUI");
     if (storedPushToTalkUI) setIsPTTActive(storedPushToTalkUI === "true");
-    const storedLogsExpanded = localStorage.getItem("logsExpanded");
-    if (storedLogsExpanded)
-      setIsEventsPaneExpanded(storedLogsExpanded === "true");
     const storedAudioPlaybackEnabled = localStorage.getItem(
       "audioPlaybackEnabled"
     );
@@ -445,9 +447,6 @@ function App() {
   useEffect(() => {
     localStorage.setItem("pushToTalkUI", isPTTActive.toString());
   }, [isPTTActive]);
-  useEffect(() => {
-    localStorage.setItem("logsExpanded", isEventsPaneExpanded.toString());
-  }, [isEventsPaneExpanded]);
   useEffect(() => {
     localStorage.setItem(
       "audioPlaybackEnabled",
@@ -514,7 +513,7 @@ function App() {
       setOffset={setOffset}
     >
       {/* ✅ Height/scroll fixes: allow mobile scroll, keep desktop tidy */}
-      <div className="text-base flex flex-col min-h-screen w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 gap-5 text-foreground overflow-y-auto lg:overflow-hidden relative">
+      <div className="text-base flex flex-col min-h-screen lg:h-screen w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 gap-5 text-foreground overflow-y-auto lg:overflow-hidden relative">
         {/* ===== Top Bar ===== */}
         <div className="flex-none rounded-lg-theme border border-border bg-card/95 backdrop-blur-sm shadow-soft px-5 py-4 flex flex-wrap items-center justify-between gap-4">
           {/* Left: Logo + Title */}
@@ -611,21 +610,19 @@ function App() {
             ref={splitContainerRef}
             className="flex flex-col gap-4 min-h-0 h-full items-stretch lg:flex-row"
           >
-            {/* LEFT: Transcript — ✅ fills to bottom immediately */}
-<div
-  className="flex flex-col min-h-[320px] flex-1 min-w-0 transition-[flex-basis] duration-200"
-  style={leftPaneStyle}
->
-  <div className="flex-1 min-h-0 overflow-hidden rounded-lg-theme border border-border bg-card/95">
-    <Transcript
-      userText={userText}
-      setUserText={setUserText}
-      onSendMessage={handleSendTextMessage}
-      downloadRecording={downloadRecording}
-      canSend={sessionStatus === "CONNECTED"}
-    />
-  </div>
-</div>
+            {/* LEFT: Transcript — ✅ stretches to the toolbar */}
+            <div
+              className="flex flex-col min-h-[320px] lg:min-h-0 flex-1 min-w-0 h-full transition-[flex-basis] duration-200"
+              style={leftPaneStyle}
+            >
+              <Transcript
+                userText={userText}
+                setUserText={setUserText}
+                onSendMessage={handleSendTextMessage}
+                downloadRecording={downloadRecording}
+                canSend={sessionStatus === "CONNECTED"}
+              />
+            </div>
 
             {/* Divider (desktop) */}
             <div
@@ -656,29 +653,22 @@ function App() {
               </button>
             </div>
 
-            {/* RIGHT: PDF / Logs — ✅ PDF fills box on phone & desktop */}
-<div
-  className="flex flex-col min-h-[320px] flex-1 min-w-0 transition-[flex-basis] duration-200"
-  style={rightPaneStyle}
->
-  <div className="flex-1 min-h-0 overflow-hidden rounded-lg-theme border border-border bg-card/95">
-    {rightPaneMode === "pdf" ? (
-      // Phone: tall viewport; Desktop: stretch to bottom.
-      <div className="relative h-[65vh] sm:h-[70vh] lg:h-full w-full">
-        <PdfPane
-          url={MARY_PDF_URL}
-          renderedPage={pdfPage}
-          zoomPct={pdfZoom}
-          label="PSW Manual"
-        />
-      </div>
-    ) : (
-      <div className="h-full w-full overflow-auto">
-        <Events isExpanded={isEventsPaneExpanded} />
-      </div>
-    )}
-  </div>
-</div>
+            {/* RIGHT: PDF / Logs — ✅ matches transcript height */}
+            <div
+              className="flex flex-col min-h-[320px] lg:min-h-0 flex-1 min-w-0 h-full transition-[flex-basis] duration-200"
+              style={rightPaneStyle}
+            >
+              {rightPaneMode === "pdf" ? (
+                <PdfPane
+                  url={MARY_PDF_URL}
+                  renderedPage={pdfPage}
+                  zoomPct={pdfZoom}
+                  label="PSW Manual"
+                />
+              ) : (
+                <Events isExpanded={isEventsPaneExpanded} />
+              )}
+            </div>
 
           </div>
         </div>
@@ -693,7 +683,7 @@ function App() {
           handleTalkButtonDown={handleTalkButtonDown}
           handleTalkButtonUp={handleTalkButtonUp}
           isEventsPaneExpanded={isEventsPaneExpanded}
-          setIsEventsPaneExpanded={setIsEventsPaneExpanded}
+          setIsEventsPaneExpanded={handleLogsVisibilityChange}
           isAudioPlaybackEnabled={isAudioPlaybackEnabled}
           setIsAudioPlaybackEnabled={setIsAudioPlaybackEnabled}
           codec={urlCodec}
