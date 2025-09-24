@@ -179,20 +179,38 @@ function App() {
     []
   );
 
-  const visibleDiagnostics = useMemo(() => {
+  const sortedDiagnostics = useMemo(() => {
     if (!activeDiagnostics.length) return [] as Diagnostic[];
-    let selected = activeDiagnostics[0];
-    let bestPriority = severityPriority[selected.severity];
-    for (let index = 1; index < activeDiagnostics.length; index += 1) {
-      const candidate = activeDiagnostics[index];
-      const priority = severityPriority[candidate.severity];
-      if (priority > bestPriority) {
-        selected = candidate;
-        bestPriority = priority;
-      }
-    }
-    return [selected];
+    return [...activeDiagnostics].sort((first, second) => {
+      const severityComparison =
+        severityPriority[second.severity] - severityPriority[first.severity];
+      if (severityComparison !== 0) return severityComparison;
+      return first.id.localeCompare(second.id);
+    });
   }, [activeDiagnostics, severityPriority]);
+
+  const [diagnosticsExpanded, setDiagnosticsExpanded] = useState(false);
+
+  useEffect(() => {
+    if (sortedDiagnostics.length <= 1) {
+      setDiagnosticsExpanded(false);
+    }
+  }, [sortedDiagnostics.length]);
+
+  const visibleDiagnostics = useMemo(() => {
+    if (!sortedDiagnostics.length) return [] as Diagnostic[];
+    if (diagnosticsExpanded) return sortedDiagnostics;
+    return [sortedDiagnostics[0]];
+  }, [sortedDiagnostics, diagnosticsExpanded]);
+
+  const suppressedDiagnosticsCount = useMemo(() => {
+    if (!sortedDiagnostics.length || diagnosticsExpanded) return 0;
+    return sortedDiagnostics.length - 1;
+  }, [sortedDiagnostics, diagnosticsExpanded]);
+
+  const toggleDiagnosticsExpanded = () => {
+    setDiagnosticsExpanded((previous) => !previous);
+  };
 
   const handleLogsVisibilityChange = (nextVisible: boolean) => {
     setIsEventsPaneExpanded(nextVisible);
@@ -679,6 +697,11 @@ function App() {
         <DiagnosticsBanner
           diagnostics={visibleDiagnostics}
           onDismiss={handleDismissDiagnostic}
+          suppressedCount={suppressedDiagnosticsCount}
+          isExpanded={diagnosticsExpanded}
+          onToggleExpanded={
+            sortedDiagnostics.length > 1 ? toggleDiagnosticsExpanded : undefined
+          }
         />
 
         {/* ===== Main Panes ===== */}

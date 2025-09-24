@@ -7,6 +7,9 @@ import type { Diagnostic } from "../hooks/useMicrophoneDiagnostics";
 interface DiagnosticsBannerProps {
   diagnostics: Diagnostic[];
   onDismiss?: (id: string) => void;
+  suppressedCount?: number;
+  isExpanded?: boolean;
+  onToggleExpanded?: () => void;
 }
 
 const severityStyles: Record<
@@ -30,11 +33,31 @@ const severityStyles: Record<
   },
 };
 
-function DiagnosticsBanner({ diagnostics, onDismiss }: DiagnosticsBannerProps) {
+function DiagnosticsBanner({
+  diagnostics,
+  onDismiss,
+  suppressedCount = 0,
+  isExpanded = false,
+  onToggleExpanded,
+}: DiagnosticsBannerProps) {
   if (!diagnostics.length) return null;
 
   return (
     <div className="flex flex-col gap-3" role="status" aria-live="polite">
+      {onToggleExpanded && (suppressedCount > 0 || isExpanded) ? (
+        <div className="flex items-center justify-end">
+          <button
+            type="button"
+            onClick={onToggleExpanded}
+            className="text-sm font-medium text-muted-soft transition hover:text-foreground"
+            aria-expanded={isExpanded}
+          >
+            {isExpanded
+              ? "Hide other issues"
+              : `Show ${suppressedCount} more issue${suppressedCount === 1 ? "" : "s"}`}
+          </button>
+        </div>
+      ) : null}
       {diagnostics.map((diagnostic) => {
         const styles = severityStyles[diagnostic.severity];
         return (
