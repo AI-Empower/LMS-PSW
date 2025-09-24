@@ -3,6 +3,7 @@ import {
   RealtimeSession,
   RealtimeAgent,
   OpenAIRealtimeWebRTC,
+  WebRTCState,
 } from '@openai/agents/realtime';
 
 import { audioFormatForCodec, applyCodecPreferences } from '../lib/codecUtils';
@@ -187,6 +188,23 @@ export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
     sessionRef.current?.mute(m);
   }, []);
 
+  const getConnectionState = useCallback((): WebRTCState | undefined => {
+    const transport = sessionRef.current?.transport as
+      | { connectionState?: WebRTCState }
+      | undefined;
+    return transport?.connectionState;
+  }, []);
+
+  const getLocalAudioTrack = useCallback((): MediaStreamTrack | null => {
+    const connectionState = getConnectionState();
+    const peerConnection = connectionState?.peerConnection;
+    if (!peerConnection) return null;
+    const audioSender = peerConnection
+      .getSenders()
+      .find((sender) => sender.track?.kind === 'audio');
+    return audioSender?.track ?? null;
+  }, [getConnectionState]);
+
   const pushToTalkStart = useCallback(() => {
     if (!sessionRef.current) return;
     sessionRef.current.transport.sendEvent({ type: 'input_audio_buffer.clear' } as any);
@@ -208,5 +226,7 @@ export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
     pushToTalkStart,
     pushToTalkStop,
     interrupt,
+    getConnectionState,
+    getLocalAudioTrack,
   } as const;
 }

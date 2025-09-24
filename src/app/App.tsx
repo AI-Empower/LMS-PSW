@@ -1,7 +1,7 @@
 // src/app/App.tsx
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import Image from "next/image";
@@ -10,7 +10,12 @@ import Transcript from "./components/Transcript";
 import Events from "./components/Events";
 import BottomToolbar from "./components/BottomToolbar";
 
-import { SessionStatus } from "@/app/types";
+import {
+  BrowserPermissionState,
+  MicrophoneDiagnostics,
+  MicrophoneTrackState,
+  SessionStatus,
+} from "@/app/types";
 import type { RealtimeAgent } from "@openai/agents/realtime";
 
 import { useTranscript } from "@/app/contexts/TranscriptContext";
@@ -63,6 +68,9 @@ function App() {
 
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const handoffTriggeredRef = useRef(false);
+  const activeDeviceIdRef = useRef<string | null>(null);
+  const lastEnergyRef = useRef<number | null>(null);
+  const silentTicksRef = useRef<number>(0);
 
   // Hidden <audio> for SDK playback
   const sdkAudioElement = React.useMemo(() => {
@@ -108,6 +116,17 @@ function App() {
     const stored = localStorage.getItem("audioPlaybackEnabled");
     return stored ? stored === "true" : true;
   });
+
+  const [microphonePermission, setMicrophonePermission] =
+    useState<BrowserPermissionState>("unknown");
+  const [hasMicrophoneDevice, setHasMicrophoneDevice] = useState<boolean>(true);
+  const [microphoneTrackState, setMicrophoneTrackState] =
+    useState<MicrophoneTrackState>("unavailable");
+  const [microphoneLevel, setMicrophoneLevel] = useState<number>(0);
+  const [noInputDetected, setNoInputDetected] = useState<boolean>(false);
+  const [activeMicrophoneLabel, setActiveMicrophoneLabel] = useState<string | null>(
+    null,
+  );
 
   // ✅ FIX: right pane mode state (used later)
   const [rightPaneMode, setRightPaneMode] = useState<RightPaneMode>("pdf");
@@ -161,6 +180,265 @@ function App() {
   };
 
   useHandleSessionHistory();
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.permissions?.query) {
+      setMicrophonePermission("unsupported");
+      return;
+    }
+
+    let cancelled = false;
+    let permissionStatus: PermissionStatus | null = null;
+
+    navigator.permissions
+      .query({ name: "microphone" as PermissionName })
+      .then((status) => {
+        if (cancelled) return;
+        permissionStatus = status;
+        const update = () => setMicrophonePermission(status.state);
+        update();
+        status.onchange = () => {
+          if (!cancelled) update();
+        };
+      })
+      .catch(() => {
+        setMicrophonePermission("unsupported");
+      });
+
+    return () => {
+      cancelled = true;
+      if (permissionStatus) {
+        permissionStatus.onchange = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices?.enumerateDevices
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const updateDevices = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        if (cancelled) return;
+        const hasMic = devices.some((device) => device.kind === "audioinput");
+        setHasMicrophoneDevice(hasMic);
+        if (activeDeviceIdRef.current) {
+          const activeDevice = devices.find(
+            (device) =>
+              device.kind === "audioinput" &&
+              device.deviceId === activeDeviceIdRef.current,
+          );
+          if (activeDevice?.label) {
+            setActiveMicrophoneLabel(activeDevice.label);
+          }
+        }
+      } catch (err) {
+        console.warn("Unable to enumerate media devices", err);
+      }
+    };
+
+    updateDevices();
+
+    const handleDeviceChange = () => {
+      updateDevices();
+    };
+
+    navigator.mediaDevices.addEventListener?.(
+      "devicechange",
+      handleDeviceChange,
+    );
+
+    return () => {
+      cancelled = true;
+      navigator.mediaDevices.removeEventListener?.(
+        "devicechange",
+        handleDeviceChange,
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (sessionStatus !== "CONNECTED") {
+      setMicrophoneTrackState("unavailable");
+      setMicrophoneLevel(0);
+      setNoInputDetected(false);
+      setActiveMicrophoneLabel(null);
+      activeDeviceIdRef.current = null;
+      lastEnergyRef.current = null;
+      silentTicksRef.current = 0;
+      return;
+    }
+
+    let cancelled = false;
+    let intervalId: number | null = null;
+
+    const evaluateMicrophone = async () => {
+      if (cancelled) return;
+
+      const track = getLocalAudioTrack();
+      let nextTrackState: MicrophoneTrackState = "unavailable";
+
+      if (!track) {
+        setMicrophoneTrackState("unavailable");
+        setMicrophoneLevel(0);
+        setNoInputDetected(false);
+        lastEnergyRef.current = null;
+        silentTicksRef.current = 0;
+        return;
+      }
+
+      if (track.readyState === "ended") {
+        nextTrackState = "ended";
+      } else if (!track.enabled) {
+        nextTrackState = "disabled";
+      } else if (track.muted) {
+        nextTrackState = "muted";
+      } else {
+        nextTrackState = "ok";
+      }
+
+      setMicrophoneTrackState(nextTrackState);
+
+      const settings = track.getSettings ? track.getSettings() : undefined;
+      const deviceId = settings?.deviceId ?? null;
+      if (deviceId && activeDeviceIdRef.current !== deviceId) {
+        activeDeviceIdRef.current = deviceId;
+        if (navigator.mediaDevices?.enumerateDevices) {
+          navigator.mediaDevices
+            .enumerateDevices()
+            .then((devices) => {
+              if (cancelled) return;
+              const match = devices.find(
+                (device) =>
+                  device.kind === "audioinput" &&
+                  device.deviceId === activeDeviceIdRef.current,
+              );
+              if (match?.label) {
+                setActiveMicrophoneLabel(match.label);
+              }
+            })
+            .catch((err) => {
+              console.warn("Unable to resolve active microphone label", err);
+            });
+        }
+      }
+
+      const connectionState = getConnectionState();
+      const peerConnection = connectionState?.peerConnection;
+      if (!peerConnection) {
+        setMicrophoneLevel(0);
+        return;
+      }
+
+      try {
+        const stats = await peerConnection.getStats();
+        if (cancelled) return;
+
+        let audioLevel: number | null = null;
+        let totalAudioEnergy: number | null = null;
+
+        stats.forEach((report) => {
+          const anyReport = report as Record<string, any>;
+          if (typeof anyReport.audioLevel === "number") {
+            audioLevel = anyReport.audioLevel;
+          }
+          if (typeof anyReport.totalAudioEnergy === "number") {
+            totalAudioEnergy = anyReport.totalAudioEnergy;
+          }
+          if (
+            report.type === "outbound-rtp" &&
+            (anyReport.kind === "audio" || anyReport.mediaType === "audio") &&
+            anyReport.trackId
+          ) {
+            const related = stats.get(anyReport.trackId);
+            if (related) {
+              const relatedAny = related as Record<string, any>;
+              if (
+                typeof relatedAny.audioLevel === "number" &&
+                audioLevel === null
+              ) {
+                audioLevel = relatedAny.audioLevel;
+              }
+              if (
+                typeof relatedAny.totalAudioEnergy === "number" &&
+                totalAudioEnergy === null
+              ) {
+                totalAudioEnergy = relatedAny.totalAudioEnergy;
+              }
+            }
+          }
+        });
+
+        if (audioLevel !== null) {
+          setMicrophoneLevel(Math.max(0, Math.min(1, audioLevel)));
+        } else if (
+          totalAudioEnergy !== null &&
+          lastEnergyRef.current !== null
+        ) {
+          const delta = totalAudioEnergy - lastEnergyRef.current;
+          setMicrophoneLevel(Math.max(0, Math.min(1, delta * 10)));
+        } else if (isPTTUserSpeaking) {
+          setMicrophoneLevel((prev) => Math.max(0, prev * 0.8));
+        } else {
+          setMicrophoneLevel(0);
+        }
+
+        let silent = false;
+        if (totalAudioEnergy !== null) {
+          if (lastEnergyRef.current !== null) {
+            const deltaEnergy = totalAudioEnergy - lastEnergyRef.current;
+            silent = deltaEnergy < 1e-7;
+          }
+          lastEnergyRef.current = totalAudioEnergy;
+        } else if (audioLevel !== null) {
+          silent = audioLevel < 0.01;
+        } else {
+          silent = true;
+        }
+
+        if (isPTTUserSpeaking && nextTrackState === "ok") {
+          if (silent) {
+            silentTicksRef.current += 1;
+          } else {
+            silentTicksRef.current = 0;
+          }
+        } else {
+          silentTicksRef.current = 0;
+        }
+
+        setNoInputDetected(
+          isPTTUserSpeaking &&
+            nextTrackState === "ok" &&
+            silentTicksRef.current >= 6,
+        );
+      } catch (err) {
+        console.warn("Unable to inspect microphone stats", err);
+      }
+    };
+
+    const intervalMs = isPTTUserSpeaking ? 500 : 1500;
+    intervalId = window.setInterval(evaluateMicrophone, intervalMs);
+    evaluateMicrophone();
+
+    return () => {
+      cancelled = true;
+      if (intervalId) window.clearInterval(intervalId);
+    };
+  }, [
+    sessionStatus,
+    isPTTUserSpeaking,
+    getConnectionState,
+    getLocalAudioTrack,
+  ]);
 
   // Pick agent set from URL (or default)
   useEffect(() => {
@@ -504,6 +782,56 @@ function App() {
     ? { flexBasis: `${((1 - splitRatio) * 100).toFixed(1)}%` }
     : undefined;
 
+  const microphoneDiagnostics: MicrophoneDiagnostics = useMemo(() => {
+    let alert: string | null = null;
+
+    if (!hasMicrophoneDevice) {
+      alert = "No microphone devices detected. Connect or enable a microphone.";
+    } else if (microphonePermission === "denied") {
+      alert = "Microphone access is blocked. Enable it in your browser settings.";
+    } else if (microphonePermission === "prompt") {
+      alert = "Allow microphone access to talk to the agent.";
+    } else if (sessionStatus === "CONNECTED") {
+      if (microphoneTrackState === "unavailable") {
+        alert = "Microphone not ready. Reconnect or refresh the session.";
+      } else if (microphoneTrackState === "disabled") {
+        alert = "Microphone is disabled. Enable it in your browser or system settings.";
+      } else if (
+        microphoneTrackState === "muted" &&
+        (isPTTUserSpeaking || !isPTTActive)
+      ) {
+        alert = "Microphone appears muted. Check hardware mute switches or OS input settings.";
+      } else if (microphoneTrackState === "ended") {
+        alert = "Microphone disconnected. Check your audio device.";
+      } else if (
+        noInputDetected &&
+        (isPTTUserSpeaking || !isPTTActive)
+      ) {
+        alert = "No microphone input detected. Verify mute status or input levels.";
+      }
+    }
+
+    return {
+      level: microphoneLevel,
+      alert,
+      permission: microphonePermission,
+      hasDevice: hasMicrophoneDevice,
+      trackState: microphoneTrackState,
+      noInputDetected,
+      activeMicrophoneLabel,
+    };
+  }, [
+    activeMicrophoneLabel,
+    hasMicrophoneDevice,
+    isPTTActive,
+    isPTTUserSpeaking,
+    microphoneLevel,
+    microphonePermission,
+    microphoneTrackState,
+    noInputDetected,
+    sessionStatus,
+  ]);
+
   return (
     <PdfNavProvider
       goToPage={goToPage}
@@ -688,6 +1016,7 @@ function App() {
           setIsAudioPlaybackEnabled={setIsAudioPlaybackEnabled}
           codec={urlCodec}
           onCodecChange={handleCodecChange}
+          microphoneDiagnostics={microphoneDiagnostics}
         />
       </div>
     </PdfNavProvider>

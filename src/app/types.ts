@@ -16,6 +16,32 @@ export const ModerationCategoryZod = z.enum([...MODERATION_CATEGORIES]);
 
 export type SessionStatus = "DISCONNECTED" | "CONNECTING" | "CONNECTED";
 
+export type BrowserPermissionState = PermissionState | "unsupported" | "unknown";
+
+export type MicrophoneTrackState =
+  | "unavailable"
+  | "ok"
+  | "muted"
+  | "disabled"
+  | "ended";
+
+export interface MicrophoneDiagnostics {
+  /** Normalized level in the range [0, 1] derived from WebRTC stats (best effort). */
+  level: number;
+  /** Friendly message explaining the most actionable microphone issue (if any). */
+  alert: string | null;
+  /** Resolved browser permission state for the microphone. */
+  permission: BrowserPermissionState;
+  /** Whether at least one microphone device is currently available. */
+  hasDevice: boolean;
+  /** State derived from the local audio track backing the realtime session. */
+  trackState: MicrophoneTrackState;
+  /** Whether a prolonged period of silence was detected while the user was speaking. */
+  noInputDetected: boolean;
+  /** Friendly label for the active microphone device (if available). */
+  activeMicrophoneLabel: string | null;
+}
+
 export interface ToolParameterProperty {
   type: string;
   description?: string;
