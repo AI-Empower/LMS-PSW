@@ -15,6 +15,7 @@ const LOCATION = process.env.VERTEX_LOCATION || 'us-central1';
 const COLLECTION = 'manual_chunks_with_metadata';
 
 // Retrieval + perf controls
+// route.ts
 const DEFAULT_SOURCE_FILE = 'PSW By Mary J. Wilk';
 const DEFAULT_TOP_K = 5;
 const MAX_TOP_K = 20;

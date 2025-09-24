@@ -49,12 +49,16 @@ export default function PdfPane({
           Open manual
         </a>
       </div>
-      <div className="flex-1 min-h-[280px] relative">
+
+      {/* Responsive wrapper:
+          - Mobile: aspect-ratio box via padding-bottom
+          - Desktop: real height via viewport units */}
+      <div className="relative w-full pb-[140%] sm:pb-0 sm:h-[70vh] lg:h-[78vh] xl:h-[84vh]">
         <iframe
           key={`${renderedPage}-${zoomPct}`}
           title={label}
           src={src}
-          className="w-full h-full rounded-b-lg"
+          className="absolute inset-0 w-full h-full rounded-b-lg"
           style={{ border: "none" }}
         />
         <div className="pointer-events-none absolute inset-0 rounded-b-lg ring-1 ring-black/5" />
@@ -62,4 +66,3 @@ export default function PdfPane({
     </div>
   );
 }
-
