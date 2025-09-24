@@ -31,7 +31,6 @@ import dynamic from "next/dynamic";
 const PdfPane = dynamic(() => import("./components/PdfPane"), { ssr: false });
 import { PdfNavProvider } from "./contexts/PdfNavContext";
 
-
 /** Map used by connect logic for scenarios defined via the SDK. */
 const sdkScenarioMap: Record<string, RealtimeAgent[]> = {
   PSW: pswTutorScenario,
@@ -94,8 +93,6 @@ function App() {
     useState<SessionStatus>("DISCONNECTED");
 
   // UI state
-  const [isEventsPaneExpanded, setIsEventsPaneExpanded] =
-    useState<boolean>(true);
   const [userText, setUserText] = useState<string>("");
   const [isPTTActive, setIsPTTActive] = useState<boolean>(() => {
     if (typeof window === "undefined") return true; // default to true on server-side render
@@ -103,20 +100,27 @@ function App() {
     return stored ? stored === "true" : true; // fallback to true if no stored value
   });
   const [isPTTUserSpeaking, setIsPTTUserSpeaking] = useState<boolean>(false);
-  const [isAudioPlaybackEnabled, setIsAudioPlaybackEnabled] = useState<boolean>(
-    () => {
-      if (typeof window === "undefined") return true;
-      const stored = localStorage.getItem("audioPlaybackEnabled");
-      return stored ? stored === "true" : true;
-    }
-  );
+
+  // ✅ FIX: define both states correctly (the previous line was broken)
+  const [isEventsPaneExpanded, setIsEventsPaneExpanded] = useState<boolean>(false);
+  const [isAudioPlaybackEnabled, setIsAudioPlaybackEnabled] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const stored = localStorage.getItem("audioPlaybackEnabled");
+    return stored ? stored === "true" : true;
+  });
+
+  // ✅ FIX: right pane mode state (used later)
+  const [rightPaneMode, setRightPaneMode] = useState<RightPaneMode>("pdf");
 
   // === PDF viewer state (NEW) ===
-  const [rightPaneMode, setRightPaneMode] = useState<RightPaneMode>("pdf"); // default to PDF
   const [pdfPage, setPdfPage] = useState<number>(1);
   const [pdfZoom, setPdfZoom] = useState<number>(DEFAULT_PDF_ZOOM);
   const [pageOffset, setPageOffset] = useState<number>(DEFAULT_PAGE_OFFSET);
 
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
+  const [splitRatio, setSplitRatio] = useState<number>(0.45);
+  const [isDraggingSplit, setIsDraggingSplit] = useState<boolean>(false);
+  const [isDesktopLayout, setIsDesktopLayout] = useState<boolean>(false);
 
   const goToPage = (page: number) => {
     setPdfPage(Math.max(1, Math.floor(page)));
@@ -179,7 +183,6 @@ function App() {
     setSelectedAgentName(agentKeyToUse);
     setSelectedAgentConfigSet(agents);
     // We only depend on the string form of searchParams to avoid unnecessary loops
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams.toString()]);
 
   // Auto-connect when agent name resolved
@@ -226,6 +229,7 @@ function App() {
 
   const connectToRealtime = async () => {
     const agentSetKey = searchParams.get("agentConfig") || "default";
+
     if (sdkScenarioMap[agentSetKey]) {
       if (sessionStatus !== "DISCONNECTED") return;
       setSessionStatus("CONNECTING");
@@ -357,6 +361,74 @@ function App() {
     window.location.replace(url.toString());
   };
 
+  const handleSplitPointerDown = (
+    event: React.PointerEvent<HTMLButtonElement>
+  ) => {
+    if (!isDesktopLayout) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.preventDefault();
+    if (event.currentTarget.setPointerCapture) {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+    setIsDraggingSplit(true);
+  };
+  const handleSplitKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>
+  ) => {
+    if (!isDesktopLayout) return;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      setSplitRatio((value) => Math.max(0.25, value - 0.02));
+    }
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      setSplitRatio((value) => Math.min(0.75, value + 0.02));
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleResize = () => {
+      setIsDesktopLayout(window.innerWidth >= 1024);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isDraggingSplit || typeof window === "undefined") return;
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!splitContainerRef.current || !isDesktopLayout) return;
+      const rect = splitContainerRef.current.getBoundingClientRect();
+      if (!rect.width) return;
+      const relativeX = (event.clientX - rect.left) / rect.width;
+      const clamped = Math.min(0.75, Math.max(0.25, relativeX));
+      setSplitRatio(clamped);
+    };
+    const handlePointerUp = () => setIsDraggingSplit(false);
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+    window.addEventListener("pointerleave", handlePointerUp);
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+      window.removeEventListener("pointerleave", handlePointerUp);
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+    };
+  }, [isDraggingSplit, isDesktopLayout]);
+
+  useEffect(() => {
+    if (!isDesktopLayout) setIsDraggingSplit(false);
+  }, [isDesktopLayout]);
+
   // Persist UI state
   useEffect(() => {
     const storedPushToTalkUI = localStorage.getItem("pushToTalkUI");
@@ -424,6 +496,14 @@ function App() {
   }, [sessionStatus]);
 
   const agentSetKey = searchParams.get("agentConfig") || "default";
+  const splitRatioPercent = Math.round(splitRatio * 100);
+
+  const leftPaneStyle: React.CSSProperties | undefined = isDesktopLayout
+    ? { flexBasis: `${(splitRatio * 100).toFixed(1)}%` }
+    : undefined;
+  const rightPaneStyle: React.CSSProperties | undefined = isDesktopLayout
+    ? { flexBasis: `${((1 - splitRatio) * 100).toFixed(1)}%` }
+    : undefined;
 
   return (
     <PdfNavProvider
@@ -433,12 +513,14 @@ function App() {
       getOffset={getOffset}
       setOffset={setOffset}
     >
-      <div className="text-base flex flex-col h-screen min-h-0 bg-background text-foreground overflow-hidden relative">
+      {/* ✅ Height/scroll fixes: allow mobile scroll, keep desktop tidy */}
+      <div className="text-base flex flex-col min-h-screen w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 gap-5 text-foreground overflow-y-auto lg:overflow-hidden relative">
         {/* ===== Top Bar ===== */}
-        <div className="flex-none p-5 text-lg font-semibold flex justify-between items-center rounded-2xl bg-white text-foreground border border-gray-200">
+        <div className="flex-none rounded-lg-theme border border-border bg-card/95 backdrop-blur-sm shadow-soft px-5 py-4 flex flex-wrap items-center justify-between gap-4">
           {/* Left: Logo + Title */}
-          <div
-            className="flex items-center cursor-pointer"
+          <button
+            type="button"
+            className="flex items-center gap-3 text-left"
             onClick={() => window.location.reload()}
           >
             <Image
@@ -446,45 +528,39 @@ function App() {
               alt="AI Empower Inc. Logo"
               width={40}
               height={40}
-              className="mr-2"
+              className="rounded-full ring-2 ring-accent/20"
             />
-            <div className="flex flex-col">
-              <span className="leading-5">AI Empower Learning Platform</span>
-              <span className="text-sm font-normal text-gray-500">PSW Course</span>
-            </div>
-          </div>
+            <span className="flex flex-col">
+              {/* ✅ Branding restored (no sample names) */}
+              <span className="text-xl font-semibold tracking-tight text-foreground">
+                AI Empower Inc.
+              </span>
+              <span className="text-sm text-muted-soft">
+                PSW Tutor Studio
+              </span>
+            </span>
+          </button>
 
           {/* Right: controls */}
-          <div className="flex items-center gap-3">
-            {/* Toggle right pane: PDF / Logs */}
-            <button
-              onClick={() =>
-                setRightPaneMode((m) => (m === "pdf" ? "logs" : "pdf"))
-              }
-              className="px-3 py-2 border rounded-md text-sm bg-gray-50 hover:bg-gray-100"
-              title="Toggle between PDF viewer and Logs"
-            >
-              {rightPaneMode === "pdf" ? "Logs" : "Open Manual"}
-            </button>
-
-            <label className="text-base font-medium">Course</label>
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <label className="text-sm font-medium text-muted-soft">Course</label>
             <div className="relative inline-block">
               <select
                 value={agentSetKey}
                 onChange={handleAgentChange}
-                className="appearance-none bg-background text-foreground border border-gray-300 rounded-lg text-base px-3 py-2 pr-8 focus:outline-none focus:ring-1"
+                className="appearance-none bg-card/90 text-foreground border border-border rounded-full text-sm px-4 py-2 pr-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
               >
                 {Object.keys(allAgentSets).map((agentKey) => (
                   <option
                     key={agentKey}
                     value={agentKey}
-                    className="bg-background text-foreground"
+                    className="bg-card text-foreground"
                   >
                     {agentKey}
                   </option>
                 ))}
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2 text-gray-500">
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-muted-soft">
                 <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path
                     fillRule="evenodd"
@@ -496,25 +572,25 @@ function App() {
             </div>
 
             {agentSetKey && (
-              <div className="flex items-center gap-2">
-                <label className="text-base font-medium">Teacher</label>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-sm font-medium text-muted-soft">Teacher</label>
                 <div className="relative inline-block">
                   <select
                     value={selectedAgentName}
                     onChange={handleSelectedAgentChange}
-                    className="appearance-none bg-background text-foreground border border-gray-300 rounded-lg text-base px-3 py-2 pr-8 focus:outline-none focus:ring-1"
+                    className="appearance-none bg-card/90 text-foreground border border-border rounded-full text-sm px-4 py-2 pr-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
                   >
                     {selectedAgentConfigSet?.map((agent) => (
                       <option
                         key={agent.name}
                         value={agent.name}
-                        className="bg-background text-foreground"
+                        className="bg-card text-foreground"
                       >
                         {agent.name}
                       </option>
                     ))}
                   </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2 text-gray-500">
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-muted-soft">
                     <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                       <path
                         fillRule="evenodd"
@@ -530,30 +606,80 @@ function App() {
         </div>
 
         {/* ===== Main Panes ===== */}
-        <div className="flex flex-1 min-h-0 gap-4 px-6 overflow-hidden relative">
-          {/* Left: Transcript */}
-          <div className="flex flex-col min-h-0 basis-full md:basis-2/5 xl:basis-5/12">
-            <Transcript
-              userText={userText}
-              setUserText={setUserText}
-              onSendMessage={handleSendTextMessage}
-              downloadRecording={downloadRecording}
-              canSend={sessionStatus === "CONNECTED"}
-            />
-          </div>
+        <div className="flex-1 min-h-0 w-full">
+          <div
+            ref={splitContainerRef}
+            className="flex flex-col gap-4 min-h-0 h-full items-stretch lg:flex-row"
+          >
+            {/* LEFT: Transcript — ✅ fills to bottom immediately */}
+<div
+  className="flex flex-col min-h-[320px] flex-1 min-w-0 transition-[flex-basis] duration-200"
+  style={leftPaneStyle}
+>
+  <div className="flex-1 min-h-0 overflow-hidden rounded-lg-theme border border-border bg-card/95">
+    <Transcript
+      userText={userText}
+      setUserText={setUserText}
+      onSendMessage={handleSendTextMessage}
+      downloadRecording={downloadRecording}
+      canSend={sessionStatus === "CONNECTED"}
+    />
+  </div>
+</div>
 
-          {/* Right: PDF viewer (default) or Logs */}
-          <div className="flex flex-col min-h-0 basis-full md:basis-3/5 xl:basis-7/12">
-            {rightPaneMode === "pdf" ? (
-              <PdfPane
-                url={MARY_PDF_URL}
-                renderedPage={pdfPage}
-                zoomPct={pdfZoom}
-                label="PSW Manual"
-              />
-            ) : (
-              <Events isExpanded={isEventsPaneExpanded} />
-            )}
+            {/* Divider (desktop) */}
+            <div
+              className="hidden lg:flex items-stretch justify-center"
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize panels"
+            >
+              <button
+                type="button"
+                role="slider"
+                onPointerDown={handleSplitPointerDown}
+                onKeyDown={handleSplitKeyDown}
+                className="group relative flex h-full w-6 items-center justify-center cursor-col-resize"
+                aria-valuenow={splitRatioPercent}
+                aria-valuemin={25}
+                aria-valuemax={75}
+                aria-valuetext={`${splitRatioPercent}% transcript width`}
+              >
+                <span
+                  className={`block h-[80%] w-[4px] rounded-full transition-colors ${
+                    isDraggingSplit ? "bg-accent" : "bg-accent-soft"
+                  }`}
+                />
+                <span className="pointer-events-none absolute top-1/2 hidden -translate-y-1/2 rounded-full border border-border bg-card/95 px-2 py-1 text-xs text-muted-soft shadow-soft group-hover:flex">
+                  Drag
+                </span>
+              </button>
+            </div>
+
+            {/* RIGHT: PDF / Logs — ✅ PDF fills box on phone & desktop */}
+<div
+  className="flex flex-col min-h-[320px] flex-1 min-w-0 transition-[flex-basis] duration-200"
+  style={rightPaneStyle}
+>
+  <div className="flex-1 min-h-0 overflow-hidden rounded-lg-theme border border-border bg-card/95">
+    {rightPaneMode === "pdf" ? (
+      // Phone: tall viewport; Desktop: stretch to bottom.
+      <div className="relative h-[65vh] sm:h-[70vh] lg:h-full w-full">
+        <PdfPane
+          url={MARY_PDF_URL}
+          renderedPage={pdfPage}
+          zoomPct={pdfZoom}
+          label="PSW Manual"
+        />
+      </div>
+    ) : (
+      <div className="h-full w-full overflow-auto">
+        <Events isExpanded={isEventsPaneExpanded} />
+      </div>
+    )}
+  </div>
+</div>
+
           </div>
         </div>
 
