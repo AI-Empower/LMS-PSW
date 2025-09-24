@@ -9,6 +9,7 @@ import Image from "next/image";
 import Transcript from "./components/Transcript";
 import Events from "./components/Events";
 import BottomToolbar from "./components/BottomToolbar";
+import DiagnosticsBanner from "./components/DiagnosticsBanner";
 
 import { SessionStatus } from "@/app/types";
 import type { RealtimeAgent } from "@openai/agents/realtime";
@@ -24,6 +25,7 @@ import { chatSupervisorCompanyName } from "@/app/agentConfigs/chatSupervisor";
 import { pswTutorScenario } from "@/app/agentConfigs/pswTutorAgent";
 
 import useAudioDownload from "./hooks/useAudioDownload";
+import useMicrophoneDiagnostics from "./hooks/useMicrophoneDiagnostics";
 import { useHandleSessionHistory } from "./hooks/useHandleSessionHistory";
 import dynamic from "next/dynamic";
 // PDF viewer wiring
@@ -80,7 +82,15 @@ function App() {
     }
   }, [sdkAudioElement]);
 
-  const { connect, disconnect, sendUserText, sendEvent, interrupt, mute } =
+  const {
+    connect,
+    disconnect,
+    sendUserText,
+    sendEvent,
+    interrupt,
+    mute,
+    getLocalMicrophoneTrack,
+  } =
     useRealtimeSession({
       onConnectionChange: (s) => setSessionStatus(s as SessionStatus),
       onAgentHandoff: (agentName: string) => {
@@ -121,6 +131,13 @@ function App() {
   const [splitRatio, setSplitRatio] = useState<number>(0.45);
   const [isDraggingSplit, setIsDraggingSplit] = useState<boolean>(false);
   const [isDesktopLayout, setIsDesktopLayout] = useState<boolean>(false);
+
+  const { diagnostics } = useMicrophoneDiagnostics({
+    sessionStatus,
+    getLocalMicrophoneTrack,
+    isPushToTalkActive: isPTTActive,
+    isUserCurrentlyTalking: isPTTUserSpeaking,
+  });
 
   const handleLogsVisibilityChange = (nextVisible: boolean) => {
     setIsEventsPaneExpanded(nextVisible);
@@ -603,6 +620,8 @@ function App() {
             )}
           </div>
         </div>
+
+        <DiagnosticsBanner diagnostics={diagnostics} />
 
         {/* ===== Main Panes ===== */}
         <div className="flex-1 min-h-0 w-full">
