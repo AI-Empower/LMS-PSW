@@ -21,11 +21,18 @@ export default function PdfPane({
   const src = useMemo(() => {
     const page = Math.max(1, Math.floor(renderedPage || 1));
     const zoom = Math.max(10, Math.floor(zoomPct || 80));
-    return `${url}#page=${page}&zoom=${zoom}%25`;
+    return `${url}#page=${page}&zoom=${zoom}`;
   }, [url, renderedPage, zoomPct]);
 
+  const containerClassName = [
+    "flex flex-col flex-1 min-h-0 h-full rounded-lg-theme border border-border bg-card/95 shadow-soft backdrop-blur-sm",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className="flex flex-col min-h-0 h-full rounded-lg-theme border border-border bg-card/95 shadow-soft backdrop-blur-sm">
+    <div className={containerClassName}>
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-border bg-accent-soft/60 rounded-t-lg">
         <span className="text-lg font-semibold text-foreground">{label}</span>
         <span className="text-xs uppercase tracking-widest text-muted-soft">
