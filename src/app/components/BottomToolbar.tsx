@@ -20,12 +20,6 @@ interface BottomToolbarProps {
   onCodecChange: (newCodec: string) => void;
 }
 
-const statusLabels: Record<SessionStatus, string> = {
-  CONNECTED: "Connected",
-  CONNECTING: "Connecting…",
-  DISCONNECTED: "Disconnected",
-};
-
 function BottomToolbar({
   sessionStatus,
   onToggleConnection,
