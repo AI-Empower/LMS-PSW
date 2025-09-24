@@ -46,9 +46,6 @@ const MARY_PDF_URL =
  */
 const DEFAULT_PDF_ZOOM = 80;
 const DEFAULT_PAGE_OFFSET = -32;
-const MIN_PDF_ZOOM = 50;
-const MAX_PDF_ZOOM = 160;
-const DEFAULT_SPLIT_RATIO = 0.45;
 
 type RightPaneMode = "pdf" | "logs";
 
@@ -121,31 +118,15 @@ function App() {
   const [pageOffset, setPageOffset] = useState<number>(DEFAULT_PAGE_OFFSET);
 
   const splitContainerRef = useRef<HTMLDivElement | null>(null);
-  const [splitRatio, setSplitRatio] = useState<number>(DEFAULT_SPLIT_RATIO);
+  const [splitRatio, setSplitRatio] = useState<number>(0.45);
   const [isDraggingSplit, setIsDraggingSplit] = useState<boolean>(false);
   const [isDesktopLayout, setIsDesktopLayout] = useState<boolean>(false);
-  const wasLogsExpandedRef = useRef<boolean>(isEventsPaneExpanded);
-
-  useEffect(() => {
-    const wasExpanded = wasLogsExpandedRef.current;
-    if (isEventsPaneExpanded && !wasExpanded) {
-      setRightPaneMode("logs");
-    }
-    if (!isEventsPaneExpanded && wasExpanded) {
-      setRightPaneMode("pdf");
-    }
-    wasLogsExpandedRef.current = isEventsPaneExpanded;
-  }, [isEventsPaneExpanded]);
 
   const goToPage = (page: number) => {
     setPdfPage(Math.max(1, Math.floor(page)));
   };
   const setZoom = (zoom: number) => {
-    const clampedZoom = Math.min(
-      MAX_PDF_ZOOM,
-      Math.max(MIN_PDF_ZOOM, Math.floor(zoom))
-    );
-    setPdfZoom(clampedZoom);
+    setPdfZoom(Math.max(10, Math.floor(zoom)));
   };
   /** Jump using printed/manual page numbers (applies offset buffer). */
   const goToLogicalPage = (printedPage: number) => {
@@ -156,19 +137,6 @@ function App() {
   };
   const getOffset = () => pageOffset;
   const setOffset = (o: number) => setPageOffset(Math.floor(o));
-
-  const handleRightPaneModeChange = (mode: RightPaneMode) => {
-    if (mode === "logs") {
-      if (!isEventsPaneExpanded) {
-        setIsEventsPaneExpanded(true);
-      }
-      setRightPaneMode("logs");
-      return;
-    }
-    setRightPaneMode("pdf");
-  };
-
-  const resetSplitRatio = () => setSplitRatio(DEFAULT_SPLIT_RATIO);
 
   // function handlePdfTotalPages(n: number) {
   //   // clamp current page to [1, n]
@@ -546,7 +514,7 @@ function App() {
       setOffset={setOffset}
     >
       {/* ✅ Height/scroll fixes: allow mobile scroll, keep desktop tidy */}
-      <div className="text-base flex flex-col min-h-[100dvh] w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 pb-6 gap-4 text-foreground">
+      <div className="text-base flex flex-col min-h-screen w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 gap-5 text-foreground overflow-y-auto lg:overflow-hidden relative">
         {/* ===== Top Bar ===== */}
         <div className="flex-none rounded-lg-theme border border-border bg-card/95 backdrop-blur-sm shadow-soft px-5 py-4 flex flex-wrap items-center justify-between gap-4">
           {/* Left: Logo + Title */}
@@ -641,21 +609,23 @@ function App() {
         <div className="flex-1 min-h-0 w-full">
           <div
             ref={splitContainerRef}
-            className="flex min-h-0 flex-col gap-4 lg:flex-row"
+            className="flex flex-col gap-4 min-h-0 h-full items-stretch lg:flex-row"
           >
             {/* LEFT: Transcript — ✅ fills to bottom immediately */}
-            <div
-              className="flex min-h-[320px] flex-1 min-w-0 flex-col transition-[flex-basis] duration-200"
-              style={leftPaneStyle}
-            >
-              <Transcript
-                userText={userText}
-                setUserText={setUserText}
-                onSendMessage={handleSendTextMessage}
-                downloadRecording={downloadRecording}
-                canSend={sessionStatus === "CONNECTED"}
-              />
-            </div>
+<div
+  className="flex flex-col min-h-[320px] flex-1 min-w-0 transition-[flex-basis] duration-200"
+  style={leftPaneStyle}
+>
+  <div className="flex-1 min-h-0 overflow-hidden rounded-lg-theme border border-border bg-card/95">
+    <Transcript
+      userText={userText}
+      setUserText={setUserText}
+      onSendMessage={handleSendTextMessage}
+      downloadRecording={downloadRecording}
+      canSend={sessionStatus === "CONNECTED"}
+    />
+  </div>
+</div>
 
             {/* Divider (desktop) */}
             <div
@@ -669,13 +639,11 @@ function App() {
                 role="slider"
                 onPointerDown={handleSplitPointerDown}
                 onKeyDown={handleSplitKeyDown}
-                onDoubleClick={resetSplitRatio}
                 className="group relative flex h-full w-6 items-center justify-center cursor-col-resize"
                 aria-valuenow={splitRatioPercent}
                 aria-valuemin={25}
                 aria-valuemax={75}
                 aria-valuetext={`${splitRatioPercent}% transcript width`}
-                title="Drag to resize panels. Double-click to reset."
               >
                 <span
                   className={`block h-[80%] w-[4px] rounded-full transition-colors ${
@@ -688,80 +656,29 @@ function App() {
               </button>
             </div>
 
-            {/* RIGHT: PDF / Logs — responsive with manual controls */}
-            <div
-              className="flex min-h-[320px] flex-1 min-w-0 flex-col transition-[flex-basis] duration-200"
-              style={rightPaneStyle}
-            >
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg-theme border border-border bg-card">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2">
-                  <div className="flex flex-wrap items-center gap-3 text-sm font-semibold text-foreground">
-                    <span>{rightPaneMode === "pdf" ? "PSW Manual" : "Session Logs"}</span>
-                    {rightPaneMode === "pdf" ? (
-                      <span className="text-xs font-medium text-muted-soft">
-                        Page {pdfPage} • {pdfZoom}%
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-500">
-                        <span
-                          className="h-2 w-2 animate-pulse rounded-full bg-emerald-500"
-                          aria-hidden="true"
-                        />
-                        Live
-                      </span>
-                    )}
-                  </div>
-                  <div className="inline-flex items-center gap-1 rounded-md border border-border bg-card p-1">
-                    <button
-                      type="button"
-                      onClick={() => handleRightPaneModeChange("pdf")}
-                      className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
-                        rightPaneMode === "pdf"
-                          ? "bg-foreground text-background shadow-sm"
-                          : "text-muted-soft hover:text-foreground"
-                      }`}
-                      aria-pressed={rightPaneMode === "pdf"}
-                    >
-                      Manual
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleRightPaneModeChange("logs")}
-                      className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
-                        rightPaneMode === "logs"
-                          ? "bg-foreground text-background shadow-sm"
-                          : isEventsPaneExpanded
-                          ? "text-muted-soft hover:text-foreground"
-                          : "text-muted-soft/70 cursor-not-allowed"
-                      }`}
-                      aria-pressed={rightPaneMode === "logs"}
-                      aria-disabled={!isEventsPaneExpanded}
-                      disabled={!isEventsPaneExpanded && rightPaneMode !== "logs"}
-                      title={
-                        isEventsPaneExpanded
-                          ? "View real-time session logs"
-                          : "Enable logs from the toolbar to view events"
-                      }
-                    >
-                      Logs
-                    </button>
-                  </div>
-                </div>
-                <div className="flex-1 min-h-0">
-                  {rightPaneMode === "pdf" ? (
-                    <PdfPane
-                      url={MARY_PDF_URL}
-                      renderedPage={pdfPage}
-                      zoomPct={pdfZoom}
-                      label="PSW Manual"
-                      className="h-full w-full"
-                    />
-                  ) : (
-                    <Events isExpanded={isEventsPaneExpanded} />
-                  )}
-                </div>
-              </div>
-            </div>
+            {/* RIGHT: PDF / Logs — ✅ PDF fills box on phone & desktop */}
+<div
+  className="flex flex-col min-h-[320px] flex-1 min-w-0 transition-[flex-basis] duration-200"
+  style={rightPaneStyle}
+>
+  <div className="flex-1 min-h-0 overflow-hidden rounded-lg-theme border border-border bg-card/95">
+    {rightPaneMode === "pdf" ? (
+      // Phone: tall viewport; Desktop: stretch to bottom.
+      <div className="relative h-[65vh] sm:h-[70vh] lg:h-full w-full">
+        <PdfPane
+          url={MARY_PDF_URL}
+          renderedPage={pdfPage}
+          zoomPct={pdfZoom}
+          label="PSW Manual"
+        />
+      </div>
+    ) : (
+      <div className="h-full w-full overflow-auto">
+        <Events isExpanded={isEventsPaneExpanded} />
+      </div>
+    )}
+  </div>
+</div>
 
           </div>
         </div>

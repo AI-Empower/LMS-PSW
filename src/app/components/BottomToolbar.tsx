@@ -54,51 +54,39 @@ function BottomToolbar({
     return "Connect";
   };
 
-  const getConnectionButtonClasses = () => {
-    const baseClasses =
-      "min-w-[9rem] rounded-md px-4 py-2 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2";
-    const cursorClass = isConnecting ? "cursor-not-allowed" : "cursor-pointer";
-
+  function getConnectionButtonClasses() {
+    const base = "text-base px-5 py-2 min-w-[9rem] rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
+    const cursor = isConnecting ? "cursor-not-allowed" : "cursor-pointer";
     if (isConnected) {
-      return `bg-rose-600 text-white hover:bg-rose-700 ${cursorClass} ${baseClasses}`;
+      return `bg-red-500/90 hover:bg-red-500 text-white shadow-sm ${cursor} ${base}`;
     }
-
-    if (isConnecting) {
-      return `bg-muted text-muted-soft ${cursorClass} ${baseClasses}`;
-    }
-
-    return `bg-emerald-600 text-white hover:bg-emerald-700 ${cursorClass} ${baseClasses}`;
-  };
+    return `bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-500/90 hover:to-emerald-600/90 text-white shadow-md ${cursor} ${base}`;
+  }
 
   return (
-    <div className="flex-none w-full border-t border-border bg-card px-4 py-4">
-      <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-foreground md:justify-between">
-        <div className="flex flex-col items-center gap-1 sm:flex-row sm:items-center sm:gap-3">
-          <button
-            onClick={onToggleConnection}
-            className={getConnectionButtonClasses()}
-            disabled={isConnecting}
-            aria-label={getConnectionButtonLabel()}
-          >
-            {getConnectionButtonLabel()}
-          </button>
-          <span className="text-xs font-medium text-muted-soft">
-            Status: {statusLabels[sessionStatus]}
-          </span>
-        </div>
+    <div className="w-full border border-border bg-card/95 backdrop-blur-sm rounded-lg-theme shadow-soft">
+      <div className="px-5 py-4 flex flex-wrap items-center justify-center gap-4 lg:justify-between text-sm text-foreground">
+        <button
+          onClick={onToggleConnection}
+          className={getConnectionButtonClasses()}
+          disabled={isConnecting}
+          aria-label={getConnectionButtonLabel()}
+        >
+          {getConnectionButtonLabel()}
+        </button>
 
-        <div className="flex flex-wrap items-center justify-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           <label htmlFor="push-to-talk" className="font-medium text-muted-soft">
             Push to talk
           </label>
-          <label className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1">
+          <label className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 bg-card/80">
             <input
               id="push-to-talk"
               type="checkbox"
               checked={isPTTActive}
               onChange={(e) => setIsPTTActive(e.target.checked)}
               disabled={!isConnected}
-              className="h-4 w-4 accent-[var(--accent)] disabled:opacity-50"
+              className="w-4 h-4 accent-[var(--accent)] disabled:opacity-50"
             />
             <span className="text-sm">Enable</span>
           </label>
@@ -109,9 +97,13 @@ function BottomToolbar({
             onTouchEnd={handleTalkButtonUp}
             disabled={!isPTTActive}
             className={[
-              "rounded-md border border-border px-4 py-1 text-sm transition-colors",
-              isPTTUserSpeaking ? "bg-foreground text-background" : "bg-card hover:bg-accent-soft",
-              !isPTTActive ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+              "px-4 py-2 rounded-full border border-transparent transition-all",
+              isPTTUserSpeaking
+                ? "bg-emerald-600 text-white shadow-sm"
+                : "bg-accent-soft text-accent hover:bg-accent-soft/80",
+              !isPTTActive
+                ? "opacity-40 cursor-not-allowed"
+                : "cursor-pointer",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
             ].join(" ")}
             aria-pressed={isPTTUserSpeaking}
@@ -120,48 +112,46 @@ function BottomToolbar({
           </button>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           <label htmlFor="audio-playback" className="font-medium text-muted-soft">
             Audio playback
           </label>
-          <label className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1">
+          <label className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 bg-card/80">
             <input
               id="audio-playback"
               type="checkbox"
               checked={isAudioPlaybackEnabled}
               onChange={(e) => setIsAudioPlaybackEnabled(e.target.checked)}
               disabled={!isConnected}
-              className="h-4 w-4 accent-[var(--accent)] disabled:opacity-50"
+              className="w-4 h-4 accent-[var(--accent)] disabled:opacity-50"
             />
             <span className="text-sm">Enable</span>
           </label>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           <label htmlFor="logs" className="font-medium text-muted-soft">
             Logs panel
           </label>
-          <label className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1">
+          <label className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 bg-card/80">
             <input
               id="logs"
               type="checkbox"
               checked={isEventsPaneExpanded}
               onChange={(e) => setIsEventsPaneExpanded(e.target.checked)}
-              className="h-4 w-4 accent-[var(--accent)]"
+              className="w-4 h-4 accent-[var(--accent)]"
             />
             <span className="text-sm">Show</span>
           </label>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <label htmlFor="codec-select" className="font-medium text-muted-soft">
-            Codec
-          </label>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="font-medium text-muted-soft">Codec</span>
           <select
             id="codec-select"
             value={codec}
             onChange={handleCodecChange}
-            className="rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="border border-transparent rounded-full bg-accent-soft/80 text-foreground px-4 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 cursor-pointer"
             aria-label="Select codec"
           >
             <option className="bg-card text-foreground" value="opus">
@@ -181,4 +171,3 @@ function BottomToolbar({
 }
 
 export default BottomToolbar;
-
