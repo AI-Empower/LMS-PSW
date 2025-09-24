@@ -1,0 +1,62 @@
+"use client";
+
+import React from "react";
+import { AlertCircle, Info, TriangleAlert } from "lucide-react";
+import type { Diagnostic } from "../hooks/useMicrophoneDiagnostics";
+
+interface DiagnosticsBannerProps {
+  diagnostics: Diagnostic[];
+}
+
+const severityStyles: Record<
+  Diagnostic["severity"],
+  { icon: React.ReactNode; border: string; accent: string }
+> = {
+  error: {
+    icon: <TriangleAlert className="h-5 w-5 text-red-500" aria-hidden />,
+    border: "border-red-400/60",
+    accent: "bg-red-500/10 text-red-700",
+  },
+  warning: {
+    icon: <AlertCircle className="h-5 w-5 text-amber-500" aria-hidden />,
+    border: "border-amber-400/60",
+    accent: "bg-amber-400/10 text-amber-700",
+  },
+  info: {
+    icon: <Info className="h-5 w-5 text-sky-500" aria-hidden />,
+    border: "border-sky-400/60",
+    accent: "bg-sky-400/10 text-sky-700",
+  },
+};
+
+function DiagnosticsBanner({ diagnostics }: DiagnosticsBannerProps) {
+  if (!diagnostics.length) return null;
+
+  return (
+    <div className="flex flex-col gap-3" role="status" aria-live="polite">
+      {diagnostics.map((diagnostic) => {
+        const styles = severityStyles[diagnostic.severity];
+        return (
+          <div
+            key={diagnostic.id}
+            className={`rounded-lg-theme border ${styles.border} bg-card/95 backdrop-blur-sm shadow-soft px-4 py-3`}
+          >
+            <div className="flex items-start gap-3">
+              <span className={`mt-0.5 inline-flex items-center justify-center rounded-full ${styles.accent} p-1`}>
+                {styles.icon}
+              </span>
+              <div className="space-y-1">
+                <p className="font-semibold text-foreground">{diagnostic.message}</p>
+                {diagnostic.description ? (
+                  <p className="text-sm text-muted-soft">{diagnostic.description}</p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default DiagnosticsBanner;
