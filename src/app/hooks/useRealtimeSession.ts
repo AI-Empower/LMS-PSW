@@ -187,6 +187,19 @@ export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
     sessionRef.current?.mute(m);
   }, []);
 
+  const getLocalMicrophoneTrack = useCallback((): MediaStreamTrack | null => {
+    const transport = sessionRef.current?.transport as
+      | (OpenAIRealtimeWebRTC & { connectionState?: { peerConnection?: RTCPeerConnection } })
+      | { connectionState?: { peerConnection?: RTCPeerConnection } }
+      | undefined;
+    const peerConnection = transport?.connectionState?.peerConnection;
+    if (!peerConnection) return null;
+    const audioSender = peerConnection
+      .getSenders()
+      .find((sender) => sender.track && sender.track.kind === 'audio');
+    return audioSender?.track ?? null;
+  }, []);
+
   const pushToTalkStart = useCallback(() => {
     if (!sessionRef.current) return;
     sessionRef.current.transport.sendEvent({ type: 'input_audio_buffer.clear' } as any);
@@ -208,5 +221,6 @@ export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
     pushToTalkStart,
     pushToTalkStop,
     interrupt,
+    getLocalMicrophoneTrack,
   } as const;
 }
