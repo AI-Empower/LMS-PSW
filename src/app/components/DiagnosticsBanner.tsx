@@ -1,11 +1,15 @@
 "use client";
 
 import React from "react";
-import { AlertCircle, Info, TriangleAlert } from "lucide-react";
+import { AlertCircle, Info, TriangleAlert, X } from "lucide-react";
 import type { Diagnostic } from "../hooks/useMicrophoneDiagnostics";
 
 interface DiagnosticsBannerProps {
   diagnostics: Diagnostic[];
+  onDismiss?: (id: string) => void;
+  suppressedCount?: number;
+  isExpanded?: boolean;
+  onToggleExpanded?: () => void;
 }
 
 const severityStyles: Record<
@@ -29,11 +33,31 @@ const severityStyles: Record<
   },
 };
 
-function DiagnosticsBanner({ diagnostics }: DiagnosticsBannerProps) {
+function DiagnosticsBanner({
+  diagnostics,
+  onDismiss,
+  suppressedCount = 0,
+  isExpanded = false,
+  onToggleExpanded,
+}: DiagnosticsBannerProps) {
   if (!diagnostics.length) return null;
 
   return (
     <div className="flex flex-col gap-3" role="status" aria-live="polite">
+      {onToggleExpanded && (suppressedCount > 0 || isExpanded) ? (
+        <div className="flex items-center justify-end">
+          <button
+            type="button"
+            onClick={onToggleExpanded}
+            className="text-sm font-medium text-muted-soft transition hover:text-foreground"
+            aria-expanded={isExpanded}
+          >
+            {isExpanded
+              ? "Hide other issues"
+              : `Show ${suppressedCount} more issue${suppressedCount === 1 ? "" : "s"}`}
+          </button>
+        </div>
+      ) : null}
       {diagnostics.map((diagnostic) => {
         const styles = severityStyles[diagnostic.severity];
         return (
@@ -45,12 +69,22 @@ function DiagnosticsBanner({ diagnostics }: DiagnosticsBannerProps) {
               <span className={`mt-0.5 inline-flex items-center justify-center rounded-full ${styles.accent} p-1`}>
                 {styles.icon}
               </span>
-              <div className="space-y-1">
+              <div className="space-y-1 flex-1">
                 <p className="font-semibold text-foreground">{diagnostic.message}</p>
                 {diagnostic.description ? (
                   <p className="text-sm text-muted-soft">{diagnostic.description}</p>
                 ) : null}
               </div>
+              {onDismiss ? (
+                <button
+                  type="button"
+                  onClick={() => onDismiss(diagnostic.id)}
+                  className="ml-auto -mr-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-soft transition hover:bg-muted/20 hover:text-muted"
+                  aria-label="Dismiss diagnostic"
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              ) : null}
             </div>
           </div>
         );

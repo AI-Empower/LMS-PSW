@@ -33,8 +33,10 @@ export function useMicrophoneDiagnostics({
   );
   const [trackMuted, setTrackMuted] = useState(false);
   const [trackEnded, setTrackEnded] = useState(false);
+  const [trackMissing, setTrackMissing] = useState(false);
   const [silenceWarning, setSilenceWarning] = useState(false);
   const [hasMicrophoneSupport, setHasMicrophoneSupport] = useState(true);
+  const [audioContextUnavailable, setAudioContextUnavailable] = useState(false);
 
   const activeTrackRef = useRef<MediaStreamTrack | null>(null);
   const trackVersionRef = useRef(0);
@@ -73,11 +75,13 @@ export function useMicrophoneDiagnostics({
 
     (async () => {
       try {
-        permissionStatus = await permissionsApi.query({ name: "microphone" });
-        updateState(permissionStatus.state as PermissionStateValue);
-        permissionStatus.onchange = () => {
-          updateState(permissionStatus?.state as PermissionStateValue);
+        const status = await permissionsApi.query({ name: "microphone" });
+        permissionStatus = status;
+        updateState(status.state as PermissionStateValue);
+        const handlePermissionChange = () => {
+          updateState(status.state as PermissionStateValue);
         };
+        status.onchange = handlePermissionChange;
       } catch (error) {
         console.warn("Microphone diagnostics: unable to query permission state", error);
         updateState("error");
@@ -98,15 +102,22 @@ export function useMicrophoneDiagnostics({
       activeTrackRef.current = null;
       setTrackMuted(false);
       setTrackEnded(false);
+      setTrackMissing(false);
       updateSilenceWarning(false);
       return;
     }
 
     const track = getLocalMicrophoneTrack();
     if (!track) {
+      activeTrackRef.current = null;
+      setTrackMuted(false);
+      setTrackEnded(false);
+      setTrackMissing(true);
+      updateSilenceWarning(false);
       return;
     }
 
+    setTrackMissing(false);
     if (activeTrackRef.current === track) {
       return;
     }
@@ -136,12 +147,14 @@ export function useMicrophoneDiagnostics({
   useEffect(() => {
     if (sessionStatus !== "CONNECTED") {
       updateSilenceWarning(false);
+      setAudioContextUnavailable(false);
       return;
     }
 
     const track = activeTrackRef.current;
     if (!track || track.readyState !== "live") {
       updateSilenceWarning(false);
+      setAudioContextUnavailable(false);
       return;
     }
 
@@ -152,6 +165,7 @@ export function useMicrophoneDiagnostics({
     let disposed = false;
     let silenceStart: number | null = null;
 
+    setAudioContextUnavailable(false);
     const startMonitoring = async () => {
       try {
         audioContext = new AudioContext();
@@ -200,6 +214,7 @@ export function useMicrophoneDiagnostics({
         rafId = requestAnimationFrame(loop);
       } catch (error) {
         console.warn("Microphone diagnostics: AudioContext unavailable", error);
+        setAudioContextUnavailable(true);
       }
     };
 
@@ -262,6 +277,16 @@ export function useMicrophoneDiagnostics({
       });
     }
 
+    if (trackMissing && sessionStatus === "CONNECTED") {
+      messages.push({
+        id: "mic-track-missing",
+        severity: "error",
+        message: "No microphone input is active.",
+        description:
+          "We could not attach to your microphone. Check if the device is selected in your browser or if another app is using it.",
+      });
+    }
+
     if (trackEnded) {
       messages.push({
         id: "mic-track-ended",
@@ -290,14 +315,26 @@ export function useMicrophoneDiagnostics({
       });
     }
 
+    if (audioContextUnavailable) {
+      messages.push({
+        id: "mic-monitoring-unavailable",
+        severity: "warning",
+        message: "Audio level monitoring is disabled.",
+        description:
+          "Your browser blocked microphone analysis, so we cannot detect silence automatically. Reload the page or allow audio processing to re-enable monitoring.",
+      });
+    }
+
     return messages;
   }, [
     hasMicrophoneSupport,
     permissionState,
     trackEnded,
     trackMuted,
+    trackMissing,
     silenceWarning,
     sessionStatus,
+    audioContextUnavailable,
   ]);
 
   return { diagnostics };
