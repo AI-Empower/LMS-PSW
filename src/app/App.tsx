@@ -1,7 +1,7 @@
 // src/app/App.tsx
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import Image from "next/image";
@@ -9,6 +9,7 @@ import Image from "next/image";
 import Transcript from "./components/Transcript";
 import Events from "./components/Events";
 import BottomToolbar from "./components/BottomToolbar";
+import DiagnosticsBanner from "./components/DiagnosticsBanner";
 
 import { SessionStatus } from "@/app/types";
 import type { RealtimeAgent } from "@openai/agents/realtime";
@@ -24,6 +25,11 @@ import { chatSupervisorCompanyName } from "@/app/agentConfigs/chatSupervisor";
 import { pswTutorScenario } from "@/app/agentConfigs/pswTutorAgent";
 
 import useAudioDownload from "./hooks/useAudioDownload";
+import useMicrophoneDiagnostics, {
+  type Diagnostic,
+  type DiagnosticSeverity,
+} from "./hooks/useMicrophoneDiagnostics";
+import useNetworkDiagnostics from "./hooks/useNetworkDiagnostics";
 import { useHandleSessionHistory } from "./hooks/useHandleSessionHistory";
 import dynamic from "next/dynamic";
 // PDF viewer wiring
@@ -80,7 +86,15 @@ function App() {
     }
   }, [sdkAudioElement]);
 
-  const { connect, disconnect, sendUserText, sendEvent, interrupt, mute } =
+  const {
+    connect,
+    disconnect,
+    sendUserText,
+    sendEvent,
+    interrupt,
+    mute,
+    getLocalMicrophoneTrack,
+  } =
     useRealtimeSession({
       onConnectionChange: (s) => setSessionStatus(s as SessionStatus),
       onAgentHandoff: (agentName: string) => {
@@ -121,6 +135,82 @@ function App() {
   const [splitRatio, setSplitRatio] = useState<number>(0.45);
   const [isDraggingSplit, setIsDraggingSplit] = useState<boolean>(false);
   const [isDesktopLayout, setIsDesktopLayout] = useState<boolean>(false);
+
+  const { diagnostics: microphoneDiagnostics } = useMicrophoneDiagnostics({
+    sessionStatus,
+    getLocalMicrophoneTrack,
+    isPushToTalkActive: isPTTActive,
+    isUserCurrentlyTalking: isPTTUserSpeaking,
+  });
+  const networkDiagnostics = useNetworkDiagnostics();
+
+  const allDiagnostics = useMemo<Diagnostic[]>(
+    () => [...networkDiagnostics, ...microphoneDiagnostics],
+    [networkDiagnostics, microphoneDiagnostics]
+  );
+
+  const [dismissedDiagnosticIds, setDismissedDiagnosticIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    setDismissedDiagnosticIds((previous) => {
+      if (!previous.length) return previous;
+      const activeIds = new Set(allDiagnostics.map((diagnostic) => diagnostic.id));
+      const filtered = previous.filter((id) => activeIds.has(id));
+      return filtered.length === previous.length ? previous : filtered;
+    });
+  }, [allDiagnostics]);
+
+  const handleDismissDiagnostic = (id: string) => {
+    setDismissedDiagnosticIds((previous) => {
+      if (previous.includes(id)) {
+        return previous;
+      }
+      return [...previous, id];
+    });
+  };
+
+  const activeDiagnostics = useMemo(
+    () => allDiagnostics.filter((diagnostic) => !dismissedDiagnosticIds.includes(diagnostic.id)),
+    [allDiagnostics, dismissedDiagnosticIds]
+  );
+
+  const severityPriority: Record<DiagnosticSeverity, number> = useMemo(
+    () => ({ error: 3, warning: 2, info: 1 }),
+    []
+  );
+
+  const sortedDiagnostics = useMemo(() => {
+    if (!activeDiagnostics.length) return [] as Diagnostic[];
+    return [...activeDiagnostics].sort((first, second) => {
+      const severityComparison =
+        severityPriority[second.severity] - severityPriority[first.severity];
+      if (severityComparison !== 0) return severityComparison;
+      return first.id.localeCompare(second.id);
+    });
+  }, [activeDiagnostics, severityPriority]);
+
+  const [diagnosticsExpanded, setDiagnosticsExpanded] = useState(false);
+
+  useEffect(() => {
+    if (sortedDiagnostics.length <= 1) {
+      setDiagnosticsExpanded(false);
+    }
+  }, [sortedDiagnostics.length]);
+
+  const visibleDiagnostics = useMemo(() => {
+    if (!sortedDiagnostics.length) return [] as Diagnostic[];
+    if (diagnosticsExpanded) return sortedDiagnostics;
+    return [sortedDiagnostics[0]];
+  }, [sortedDiagnostics, diagnosticsExpanded]);
+
+  const suppressedDiagnosticsCount = useMemo(() => {
+    if (!sortedDiagnostics.length || diagnosticsExpanded) return 0;
+    return sortedDiagnostics.length - 1;
+  }, [sortedDiagnostics, diagnosticsExpanded]);
+
+  const toggleDiagnosticsExpanded = () => {
+    setDiagnosticsExpanded((previous) => !previous);
+  };
 
   const handleLogsVisibilityChange = (nextVisible: boolean) => {
     setIsEventsPaneExpanded(nextVisible);
@@ -603,6 +693,16 @@ function App() {
             )}
           </div>
         </div>
+
+        <DiagnosticsBanner
+          diagnostics={visibleDiagnostics}
+          onDismiss={handleDismissDiagnostic}
+          suppressedCount={suppressedDiagnosticsCount}
+          isExpanded={diagnosticsExpanded}
+          onToggleExpanded={
+            sortedDiagnostics.length > 1 ? toggleDiagnosticsExpanded : undefined
+          }
+        />
 
         {/* ===== Main Panes ===== */}
         <div className="flex-1 min-h-0 w-full">

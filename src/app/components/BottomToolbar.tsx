@@ -82,12 +82,12 @@ function BottomToolbar({
   // Safe talk wrappers: no-op unless connected & PTT enabled
   const canTalk = mounted && isConnected && isPTTActive;
 
-  const onSafeTalkDown = (e: React.MouseEvent | React.TouchEvent) => {
+  const onSafeTalkDown = () => {
     if (!canTalk) return;
     handleTalkButtonDown();
   };
 
-  const onSafeTalkUp = (e: React.MouseEvent | React.TouchEvent) => {
+  const onSafeTalkUp = () => {
     if (!canTalk) return;
     handleTalkButtonUp();
   };
