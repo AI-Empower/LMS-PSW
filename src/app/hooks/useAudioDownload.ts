@@ -4,6 +4,8 @@ import { convertWebMBlobToWav } from "../lib/audioUtils";
 function useAudioDownload() {
   // Ref to store the MediaRecorder instance.
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  // Ref to keep track of the active AudioContext so we can close it later.
+  const audioContextRef = useRef<AudioContext | null>(null);
   // Ref to collect all recorded Blob chunks.
   const recordedChunksRef = useRef<Blob[]>([]);
 
@@ -13,6 +15,12 @@ function useAudioDownload() {
    * @param remoteStream - The remote MediaStream (e.g., from the audio element).
    */
   const startRecording = async (remoteStream: MediaStream) => {
+    recordedChunksRef.current = [];
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => undefined);
+      audioContextRef.current = null;
+    }
+
     let micStream: MediaStream;
     try {
       micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -24,6 +32,7 @@ function useAudioDownload() {
 
     // Create an AudioContext to merge the streams.
     const audioContext = new AudioContext();
+    audioContextRef.current = audioContext;
     const destination = audioContext.createMediaStreamDestination();
 
     // Connect the remote audio stream.
@@ -50,6 +59,13 @@ function useAudioDownload() {
           recordedChunksRef.current.push(event.data);
         }
       };
+      mediaRecorder.addEventListener("stop", () => {
+        const context = audioContextRef.current;
+        audioContextRef.current = null;
+        if (context) {
+          context.close().catch(() => undefined);
+        }
+      });
       // Start recording without a timeslice.
       mediaRecorder.start();
       mediaRecorderRef.current = mediaRecorder;
@@ -67,6 +83,12 @@ function useAudioDownload() {
       mediaRecorderRef.current.requestData();
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current = null;
+    }
+
+    const context = audioContextRef.current;
+    audioContextRef.current = null;
+    if (context) {
+      context.close().catch(() => undefined);
     }
   };
 
@@ -87,7 +109,7 @@ function useAudioDownload() {
       console.warn("No recorded chunks found to download.");
       return;
     }
-    
+
     // Combine the recorded chunks into a single WebM blob.
     const webmBlob = new Blob(recordedChunksRef.current, { type: "audio/webm" });
 
@@ -118,4 +140,4 @@ function useAudioDownload() {
   return { startRecording, stopRecording, downloadRecording };
 }
 
-export default useAudioDownload; 
+export default useAudioDownload;

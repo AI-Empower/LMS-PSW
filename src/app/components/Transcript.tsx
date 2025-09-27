@@ -29,7 +29,7 @@ function Transcript({
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const [prevLogs, setPrevLogs] = useState<TranscriptItem[]>([]);
+  const [, setPrevLogs] = useState<TranscriptItem[]>([]);
   const [justCopied, setJustCopied] = useState(false);
 
   function scrollToBottom() {
@@ -39,14 +39,18 @@ function Transcript({
   }
 
   useEffect(() => {
-    const hasNewMessage = transcriptItems.length > prevLogs.length;
-    const hasUpdatedMessage = transcriptItems.some((nextItem, index) => {
-      const previous = prevLogs[index];
-      return previous && (nextItem.title !== previous.title || nextItem.data !== previous.data);
+    setPrevLogs((previous) => {
+      const hasNewMessage = transcriptItems.length > previous.length;
+      const hasUpdatedMessage = transcriptItems.some((nextItem, index) => {
+        const prior = previous[index];
+        return prior && (nextItem.title !== prior.title || nextItem.data !== prior.data);
+      });
+      if (hasNewMessage || hasUpdatedMessage) {
+        scrollToBottom();
+      }
+      return transcriptItems;
     });
-    if (hasNewMessage || hasUpdatedMessage) scrollToBottom();
-    setPrevLogs(transcriptItems);
-  }, [transcriptItems, prevLogs]);
+  }, [transcriptItems]);
 
   useEffect(() => {
     if (canSend && inputRef.current) inputRef.current.focus();
@@ -204,7 +208,4 @@ function Transcript({
 }
 
 export default Transcript;
-
-
-
 

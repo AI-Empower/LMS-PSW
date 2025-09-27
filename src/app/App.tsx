@@ -144,9 +144,16 @@ function App() {
   });
   const networkDiagnostics = useNetworkDiagnostics();
 
+  const effectiveMicrophoneDiagnostics = useMemo(() => {
+    if (isPTTActive) {
+      return microphoneDiagnostics;
+    }
+    return microphoneDiagnostics.filter((diagnostic) => diagnostic.severity !== 'error');
+  }, [isPTTActive, microphoneDiagnostics]);
+
   const allDiagnostics = useMemo<Diagnostic[]>(
-    () => [...networkDiagnostics, ...microphoneDiagnostics],
-    [networkDiagnostics, microphoneDiagnostics]
+    () => [...networkDiagnostics, ...effectiveMicrophoneDiagnostics],
+    [networkDiagnostics, effectiveMicrophoneDiagnostics]
   );
 
   const [dismissedDiagnosticIds, setDismissedDiagnosticIds] = useState<string[]>([]);
@@ -794,3 +801,4 @@ function App() {
 }
 
 export default App;
+
