@@ -613,11 +613,10 @@ function App() {
             onClick={() => window.location.reload()}
           >
             <Image
-              src="/aiempower-logomark.png"
+              src="/aiempower-logomark1.png"
               alt="AI Empower Inc. Logo"
-              width={40}
-              height={40}
-              className="rounded-full ring-2 ring-accent/20"
+              width={50}
+              height={50}
             />
             <span className="flex flex-col">
               {/* ✅ Branding restored (no sample names) */}
