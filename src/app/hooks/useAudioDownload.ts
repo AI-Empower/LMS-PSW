@@ -125,7 +125,7 @@ function useAudioDownload() {
       const a = document.createElement("a");
       a.style.display = "none";
       a.href = url;
-      a.download = `realtime_agents_audio_${now}.wav`;
+      a.download = `AIEmpower-LMS_${now}.wav`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
